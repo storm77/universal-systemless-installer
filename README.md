@@ -4,9 +4,9 @@
               >>> Xposed Universal Systemless Installer v0.1b by st0rm <<<
 
 <B>Features:</B></BR>
-* universal: works on all devices xposed is written for (auto-detect cpu and sdk)</BR>
+* universal: works on all devices xposed is written for (auto-detect cpu and sdk during install)</BR>
 * futureproof: compatible with any future versions of xposed-framework ( v87+ )</BR>
-* trustability: installs and patches from official xposed-framework zipfiles</BR>
+* trustability: installs and patches the official xposed-framework zipfiles</BR>
 * compatible: also works with any unofficial release although not tested</BR>
 * secure: xposed.img is mounted read-only</BR>
 * small: smallest possible footprint for xposed.img</BR>
@@ -24,13 +24,13 @@
 ##########################################################################################
 <B>Faq</B>
 
-why did you write it?
+<B>why did you write it?</B>
  i thought i could do a better job, you decide
 
-is it safe?
+<B>is it safe ?</B>
  its the first release and beta, make no assumptions, backup your device
 
-howto install ?
+<B>how to install</B>
  >>> WARNING: it will overwrite /data/xposed.img without prompt! <<<
  1. download the xposed-usi-v*.zip
  2. download the proper xposed-v*-sdk*-*.zip version for your device
@@ -40,15 +40,16 @@ howto install ?
  4. install the xposed-usi-v*.zip
  5. reboot
 
-how do i know what version of xposed i need ?
+<B>how do i know what version of xposed i need ?</B>
  run the xposed installer by dvdandroid
  or run the xposed-usi-*.zip
  both will show which version you need
 ##########################################################################################
 
-bugs/problems:
+<B>bugs/problems:</B>
  probably, i only have one device
  (and an old one at that, donate and i will get a new one)
  
-donate:
+<B>donate:</B>
  bitcoin address: 1HPRug5MFDp2eA3rr4kDEhV1gEguinRnpQ
+ * not going to lie here, i just really need the money
