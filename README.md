@@ -1,9 +1,7 @@
 # universal-systemless-installer
-Universal Systemless Installer for Xposed Framework
 
 ##########################################################################################
               >>> Xposed Universal Systemless Installer v0.1b by st0rm <<<
-##########################################################################################
 
 features:
    universal: works on all devices xposed is written for (auto-detect cpu and sdk)
@@ -17,7 +15,6 @@ requirements:
  twrp     (tested with 3.0+)
  supersu  (tested with 2.65+)
 
-##########################################################################################
  Urls/Credits
 ##########################################################################################
  http://dl-xda.xposed.info/framework 		: rovo89 - xposed framework
