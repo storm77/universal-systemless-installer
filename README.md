@@ -2,7 +2,7 @@
 
               >>> Xposed Universal Systemless Installer v0.1b by st0rm <<<
 </BR>
-<B>Features:</B></BR>
+  <B>Features:</B></BR>
 * universal: works on all devices xposed is written for (auto-detect cpu and sdk during install)</BR>
 * futureproof: compatible with any future versions of xposed-framework ( v87+ )</BR>
 * trustability: installs and patches the official xposed-framework zipfiles</BR>
@@ -31,7 +31,7 @@
   its the first release and beta, make no assumptions, backup your device</BR>
 </BR>
 <B>How to install</B></BR>
-* <I>WARNING:</I> it will overwrite /data/xposed.img without prompt!</BR>
+* <I>WARNING:</I> it will overwrite /data/xposed.img without prompt!</BR>*
   - download the xposed-usi-v*.zip</BR>
   - download the proper xposed-v*-sdk*-*.zip version for your device</BR>
   and place it alongside or in a subfolder (auto-detect)</BR>
