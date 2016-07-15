@@ -32,13 +32,13 @@
 
 <B>how to install</B>
  >>> WARNING: it will overwrite /data/xposed.img without prompt! <<<
- 1. download the xposed-usi-v*.zip
- 2. download the proper xposed-v*-sdk*-*.zip version for your device
-    and place it alongside or in a subfolder (auto-detect)
- 3. download the XposedInstaller_by_dvdandroid.apk
-    and place it alongside or in a subfolder (auto-detect)
- 4. install the xposed-usi-v*.zip
- 5. reboot
+ 1. download the xposed-usi-v*.zip</BR>
+ 2. download the proper xposed-v*-sdk*-*.zip version for your device</BR>
+    and place it alongside or in a subfolder (auto-detect)</BR>
+ 3. download the XposedInstaller_by_dvdandroid.apk</BR>
+    and place it alongside or in a subfolder (auto-detect)</BR>
+ 4. install the xposed-usi-v*.zip</BR>
+ 5. reboot</BR>
 
 <B>how do i know what version of xposed i need ?</B>
  run the xposed installer by dvdandroid
@@ -47,9 +47,10 @@
 ##########################################################################################
 
 <B>bugs/problems:</B>
- probably, i only have one device
- (and an old one at that, donate and i will get a new one)
+ probably, i only have one device</BR>
+ (and an old one at that, donate and i will get a new one)</BR>
  
-<B>donate:</B>
- bitcoin address: 1HPRug5MFDp2eA3rr4kDEhV1gEguinRnpQ
- * not going to lie here, i just really need the money
+<B>donate:</B></BR>
+ bitcoin address: 1HPRug5MFDp2eA3rr4kDEhV1gEguinRnpQ</BR>
+ 
+ * not going to lie here, i just really need the money</BR>
