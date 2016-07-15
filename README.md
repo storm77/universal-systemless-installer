@@ -1,6 +1,5 @@
 # universal-systemless-installer
 
-##########################################################################################
               >>> Xposed Universal Systemless Installer v0.1b by st0rm <<<
 
 <B>Features:</B></BR>
@@ -16,12 +15,12 @@
 * supersu  (tested with 2.65+)</BR>
 </BR>
 <B>Urls/Credits</B></BR>
-##########################################################################################
+</BR>
 * http://dl-xda.xposed.info/framework            - rovo89 / xposed framework
 * http://download.chainfire.eu/supersu           - chainfire / systemless idea & tools
 * http://topjohnwu.github.io/                    - topjohnwu / systemless xposed idea
 * https://github.com/dvdandroid/XposedInstaller  - dvdandroid / xposed-installer
-##########################################################################################
+</BR>
 <B>Faq</B>
 
 <B>why did you write it?</B>
@@ -44,7 +43,7 @@
  run the xposed installer by dvdandroid</BR>
  or run the xposed-usi-*.zip</BR>
  both will show which version you need</BR>
-##########################################################################################
+</BR>
 
 <B>bugs/problems:</B>
  probably, i only have one device</BR>
