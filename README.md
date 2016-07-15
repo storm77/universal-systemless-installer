@@ -38,8 +38,8 @@
   - download the XposedInstaller_by_dvdandroid.apk</BR>
   and place it alongside or in a subfolder (auto-detect)</BR>
   - install the xposed-usi-v*.zip</BR>
-  reboot</BR>
-</BR>
+  - reboot</BR>
+</B></BR>
 <B>How do i know what version of xposed i need ?</B></BR>
   run the xposed installer by dvdandroid</BR>
   or run the xposed-usi-*.zip</BR>
