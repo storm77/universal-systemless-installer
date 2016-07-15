@@ -41,9 +41,9 @@
  5. reboot</BR>
 
 <B>how do i know what version of xposed i need ?</B>
- run the xposed installer by dvdandroid
- or run the xposed-usi-*.zip
- both will show which version you need
+ run the xposed installer by dvdandroid</BR>
+ or run the xposed-usi-*.zip</BR>
+ both will show which version you need</BR>
 ##########################################################################################
 
 <B>bugs/problems:</B>
@@ -51,6 +51,6 @@
  (and an old one at that, donate and i will get a new one)</BR>
  
 <B>donate:</B></BR>
- bitcoin address: 1HPRug5MFDp2eA3rr4kDEhV1gEguinRnpQ</BR>
+ * bitcoin address: 1HPRug5MFDp2eA3rr4kDEhV1gEguinRnpQ</BR>
  
- * not going to lie here, i just really need the money</BR>
+ (not going to lie here, i just really need the money)</BR>
