@@ -14,18 +14,18 @@
 * twrp     (tested with 3.0+)</BR>
 * supersu  (tested with 2.65+)</BR>
 </BR>
-<B>Urls/Credits</B></BR>
-</BR>
+<B>Urls/Credits:</B></BR>
 * http://dl-xda.xposed.info/framework            - rovo89 / xposed framework
 * http://download.chainfire.eu/supersu           - chainfire / systemless idea & tools
 * http://topjohnwu.github.io/                    - topjohnwu / systemless xposed idea
 * https://github.com/dvdandroid/XposedInstaller  - dvdandroid / xposed-installer
-</BR></BR>
+</BR>
+</BR>
 <B>Faq</B></BR>
 </BR>
   <B>why did you write it?</B></BR>
   i thought i could do a better job, you decide
-</BR>
+</BR></BR>
   <B>is it safe ?</B></BR>
   its the first release and beta, make no assumptions, backup your device
 
@@ -44,9 +44,9 @@ run the xposed installer by dvdandroid</BR>
 or run the xposed-usi-*.zip</BR>
 both will show which version you need</BR>
 </BR>
-<B>bugs/problems:</B></BR>
+<B>Bugs/problems:</B></BR>
 probably, i only have one device</BR>
-(and an old one at that, donate and i will get a new one)</BR>
+post to this forum thread</BR>
 </BR> 
 <B>donate:</B></BR>
 * bitcoin address: 1HPRug5MFDp2eA3rr4kDEhV1gEguinRnpQ</BR>
