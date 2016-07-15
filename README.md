@@ -24,10 +24,10 @@
 <B>Faq</B></BR>
 </BR>
   <B>why did you write it?</B></BR>
-  i thought i could do a better job, you decide
+  * i thought i could do a better job, you decide
 </BR></BR>
   <B>is it safe ?</B></BR>
-  its the first release and beta, make no assumptions, backup your device
+  * its the first release and beta, make no assumptions, backup your device
 
   <B>how to install</B></BR>
   * WARNING: it will overwrite /data/xposed.img without prompt!</BR>
@@ -45,8 +45,8 @@ or run the xposed-usi-*.zip</BR>
 both will show which version you need</BR>
 </BR>
 <B>Bugs/problems:</B></BR>
-probably, i only have one device</BR>
-post to this forum thread</BR>
+  * probably, i only have one device</BR>
+  * post to this forum thread</BR>
 </BR> 
 <B>donate:</B></BR>
 * bitcoin address: 1HPRug5MFDp2eA3rr4kDEhV1gEguinRnpQ</BR>
