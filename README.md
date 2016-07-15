@@ -21,7 +21,8 @@
 * https://github.com/dvdandroid/XposedInstaller  - dvdandroid / xposed-installer
 </BR>
 </BR>
-<B>Faq</B></BR>
+</BR>
+<B>Faq:</B></BR>
 </BR>
 <B>Why did you write it?</B></BR>
   i thought i could do a better job, you decide
