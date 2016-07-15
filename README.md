@@ -18,16 +18,15 @@ requirements:
  supersu  (tested with 2.65+)
 
 ##########################################################################################
-# Urls/Credits
+ Urls/Credits
 ##########################################################################################
-# http://dl-xda.xposed.info/framework 		: rovo89 - xposed framework
-# http://download.chainfire.eu/supersu 		: chainfire - systemless idea & tools
-# http://topjohnwu.github.io/ 			: topjohnwu - systemless xposed idea
-# https://github.com/dvdandroid/XposedInstaller : dvdandroid - xposed-installer
+ http://dl-xda.xposed.info/framework 		: rovo89 - xposed framework
+ http://download.chainfire.eu/supersu 		: chainfire - systemless idea & tools
+ http://topjohnwu.github.io/ 			: topjohnwu - systemless xposed idea
+ https://github.com/dvdandroid/XposedInstaller : dvdandroid - xposed-installer
 
 ##########################################################################################
-# FAQ
-##########################################################################################
+FAQ
 
 why did you write it?
  i thought i could do a better job, you decide
@@ -50,10 +49,11 @@ how do i know what version of xposed i need ?
  run the xposed installer by dvdandroid
  or run the xposed-usi-*.zip
  both will show which version you need
+##########################################################################################
 
 bugs/problems:
  probably, i only have one device
  (and an old one at that, donate and i will get a new one)
-
+ 
 donate:
  bitcoin address: 1HPRug5MFDp2eA3rr4kDEhV1gEguinRnpQ
