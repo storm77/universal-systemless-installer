@@ -23,30 +23,30 @@
 </BR>
 <B>Faq</B></BR>
 </BR>
-  <B>why did you write it?</B></BR>
-  * i thought i could do a better job, you decide
+<B>Why did you write it?</B></BR>
+* i thought i could do a better job, you decide
 </BR></BR>
-  <B>is it safe ?</B></BR>
-  * its the first release and beta, make no assumptions, backup your device
-
-  <B>how to install</B></BR>
-  * WARNING: it will overwrite /data/xposed.img without prompt!</BR>
-  1. download the xposed-usi-v*.zip</BR>
-  2. download the proper xposed-v*-sdk*-*.zip version for your device</BR>
-     and place it alongside or in a subfolder (auto-detect)</BR>
-  3. download the XposedInstaller_by_dvdandroid.apk</BR>
-     and place it alongside or in a subfolder (auto-detect)</BR>
-  4. install the xposed-usi-v*.zip</BR>
-  5. reboot</BR>
+<B>Is it safe ?</B></BR>
+* its the first release and beta, make no assumptions, backup your device
 </BR>
-<B>how do i know what version of xposed i need ?</B></BR>
-run the xposed installer by dvdandroid</BR>
-or run the xposed-usi-*.zip</BR>
-both will show which version you need</BR>
+<B>How to install</B></BR>
+* <I>WARNING:</I> it will overwrite /data/xposed.img without prompt!</BR>
+1. download the xposed-usi-v*.zip</BR>
+2. download the proper xposed-v*-sdk*-*.zip version for your device</BR>
+   and place it alongside or in a subfolder (auto-detect)</BR>
+3. download the XposedInstaller_by_dvdandroid.apk</BR>
+   and place it alongside or in a subfolder (auto-detect)</BR>
+4. install the xposed-usi-v*.zip</BR>
+5. reboot</BR>
+</BR>
+<B>How do i know what version of xposed i need ?</B></BR>
+* run the xposed installer by dvdandroid</BR>
+* or run the xposed-usi-*.zip</BR>
+* both will show which version you need</BR>
 </BR>
 <B>Bugs/problems:</B></BR>
-  * probably, i only have one device</BR>
-  * post to this forum thread</BR>
+* probably, i only have one device</BR>
+* post to this forum thread</BR>
 </BR> 
 <B>donate:</B></BR>
 * bitcoin address: 1HPRug5MFDp2eA3rr4kDEhV1gEguinRnpQ</BR>
