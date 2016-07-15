@@ -1,7 +1,7 @@
 # universal-systemless-installer
 
               >>> Xposed Universal Systemless Installer v0.1b by st0rm <<<
-
+</BR>
 <B>Features:</B></BR>
 * universal: works on all devices xposed is written for (auto-detect cpu and sdk during install)</BR>
 * futureproof: compatible with any future versions of xposed-framework ( v87+ )</BR>
@@ -22,34 +22,33 @@
 * https://github.com/dvdandroid/XposedInstaller  - dvdandroid / xposed-installer
 </BR>
 <B>Faq</B>
-
-<B>why did you write it?</B>
- i thought i could do a better job, you decide
-
-<B>is it safe ?</B>
- its the first release and beta, make no assumptions, backup your device
-
-<B>how to install</B>
- >>> WARNING: it will overwrite /data/xposed.img without prompt! <<<
- 1. download the xposed-usi-v*.zip</BR>
- 2. download the proper xposed-v*-sdk*-*.zip version for your device</BR>
-    and place it alongside or in a subfolder (auto-detect)</BR>
- 3. download the XposedInstaller_by_dvdandroid.apk</BR>
-    and place it alongside or in a subfolder (auto-detect)</BR>
- 4. install the xposed-usi-v*.zip</BR>
- 5. reboot</BR>
-
-<B>how do i know what version of xposed i need ?</B>
- run the xposed installer by dvdandroid</BR>
- or run the xposed-usi-*.zip</BR>
- both will show which version you need</BR>
 </BR>
+  <B>why did you write it?</B>
+    i thought i could do a better job, you decide
+</BR>
+  <B>is it safe ?</B>
+    its the first release and beta, make no assumptions, backup your device
 
-<B>bugs/problems:</B>
- probably, i only have one device</BR>
- (and an old one at that, donate and i will get a new one)</BR>
+  <B>how to install</B>
+    * WARNING: it will overwrite /data/xposed.img without prompt!
+  1. download the xposed-usi-v*.zip</BR>
+  2. download the proper xposed-v*-sdk*-*.zip version for your device</BR>
+     and place it alongside or in a subfolder (auto-detect)</BR>
+  3. download the XposedInstaller_by_dvdandroid.apk</BR>
+     and place it alongside or in a subfolder (auto-detect)</BR>
+  4. install the xposed-usi-v*.zip</BR>
+  5. reboot</BR>
+
+  <B>how do i know what version of xposed i need ?</B>
+  run the xposed installer by dvdandroid</BR>
+  or run the xposed-usi-*.zip</BR>
+  both will show which version you need</BR>
+  </BR>
+
+  <B>bugs/problems:</B>
+  probably, i only have one device</BR>
+  (and an old one at that, donate and i will get a new one)</BR>
  
-<B>donate:</B></BR>
- * bitcoin address: 1HPRug5MFDp2eA3rr4kDEhV1gEguinRnpQ</BR>
- 
- (not going to lie here, i just really need the money)</BR>
+  <B>donate:</B></BR>
+  * bitcoin address: 1HPRug5MFDp2eA3rr4kDEhV1gEguinRnpQ</BR>
+   (not going to lie here, i just really need the money)</BR>
