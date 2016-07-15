@@ -10,20 +10,19 @@
 * compatible: also works with any unofficial release although not tested</BR>
 * secure: xposed.img is mounted read-only</BR>
 * small: smallest possible footprint for xposed.img</BR>
-</BR></BR>
-Requirements:</BR>
- twrp     (tested with 3.0+)</BR>
- supersu  (tested with 2.65+)</BR>
 </BR>
-Urls/Credits</BR>
+<B>Requirements:</B></BR>
+* twrp     (tested with 3.0+)</BR>
+* supersu  (tested with 2.65+)</BR>
+</BR>
+<B>Urls/Credits</B></BR>
 ##########################################################################################
- * http://dl-xda.xposed.info/framework            - rovo89 / xposed framework
- * http://download.chainfire.eu/supersu           - chainfire / systemless idea & tools
- * http://topjohnwu.github.io/                    - topjohnwu / systemless xposed idea
- * https://github.com/dvdandroid/XposedInstaller  - dvdandroid / xposed-installer
-
+* http://dl-xda.xposed.info/framework            - rovo89 / xposed framework
+* http://download.chainfire.eu/supersu           - chainfire / systemless idea & tools
+* http://topjohnwu.github.io/                    - topjohnwu / systemless xposed idea
+* https://github.com/dvdandroid/XposedInstaller  - dvdandroid / xposed-installer
 ##########################################################################################
-FAQ
+<B>Faq</B>
 
 why did you write it?
  i thought i could do a better job, you decide
@@ -38,7 +37,6 @@ howto install ?
     and place it alongside or in a subfolder (auto-detect)
  3. download the XposedInstaller_by_dvdandroid.apk
     and place it alongside or in a subfolder (auto-detect)
-
  4. install the xposed-usi-v*.zip
  5. reboot
 
