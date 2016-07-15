@@ -1,0 +1,324 @@
+#!/sbin/sh
+#This file is part of Universal Systemless Installer
+#
+#    The Universal Systemless Installer scripts are free software: you can redistribute
+#    it and/or modify it under the terms of the GNU General Public License as published
+#    by the Free Software Foundation, either version 2 of the License, or
+#    (at your option) any later version, w/Systemless Xposed installable zip exception.
+#
+#    These scripts are distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+
+##########################################################################################
+# Changelog
+##########################################################################################
+# v0.1b - added auto installation of material-design-xposed-installer
+# v0.1a - initial alpha non-public release
+#       - 
+
+##########################################################################################
+# Urls/Credits
+##########################################################################################
+# http://dl-xda.xposed.info/framework 		: rovo89 - xposed framework
+# http://download.chainfire.eu/supersu 		: chainfire - systemless idea & tools
+# http://topjohnwu.github.io/ 			: topjohnwu - systemless xposed idea
+# https://github.com/dvdandroid/XposedInstaller : dvdandroid - xposed-installer
+
+##########################################################################################
+# Variables
+##########################################################################################
+OUTFD="/proc/self/fd/$2"
+ZIP="$3"
+ZIPDIR="${3%/*}"
+TMPDIR="/tmp/$RANDOM"
+IMGDIR="/xposed"
+IMGNAME="xposed.img"
+APP="Universal Systemless Installer for Xposed Framework"
+AUT="st0rm"
+VER="0.1b"
+LIC="GPL v2"
+
+##########################################################################################
+# Cleaning up
+##########################################################################################
+trap '
+rm -rf "$TMPDIR"
+sync
+unset LD_LIBRARY_PATH
+mountpoint -q $IMGDIR && umount $IMGDIR
+mountpoint -q /system && umount /system
+#[ -f /tmp/recovery.log ] && cat /tmp/recovery.log|tail -c+$LOGSIZE > $ZIP.log
+exit
+' 0 1 2 3 15
+
+LOGSIZE=`wc -c < /tmp/recovery.log`
+rm $ZIP.log
+
+##########################################################################################
+# Functions
+##########################################################################################
+ui_print(){ printf "ui_print $*\n\n">$OUTFD;}
+ui_print_exit(){ printf "ui_print $*\n\n">$OUTFD;exit 1;}
+grep_prop(){ grep "^$1=" $2|sed "s/.*=//g";}
+set_perm(){ chcon $1 $5 && chmod $2 $5 && chown $3:$4 $5;}
+
+##########################################################################################
+# Banner
+##########################################################################################
+ui_print " "
+ui_print "******************************"
+ui_print "Universal Systemless Installer"
+ui_print "    for Xposed Framework"
+ui_print "         ver: $VER"
+ui_print " "
+ui_print "     written by: $AUT"
+ui_print "   Licensed under: $LIC"
+ui_print "******************************"
+
+##########################################################################################
+# Mounting
+##########################################################################################
+ui_print "- Mounting /system(ro), /cache, /data"
+mount -o,ro /system
+mount /cache
+mount /data
+
+ui_print "- Setting library path"
+[ -d /system/lib64 ] \
+  && LD_LIBRARY_PATH=/system/lib64 \
+  || LD_LIBRARY_PATH=/system/lib
+
+##########################################################################################
+# Prerequisites
+##########################################################################################
+
+ui_print "- Checking cpu architecture"
+
+BUILD_PROP="/system/build.prop"
+[ ! -f $BUILD_PROP ] \
+  && ui_print_exit "! Failed: build.prop not found"
+
+ABI=`grep ^ro.product.cpu.abi $BUILD_PROP|\
+     sed 's/.*=/\n/;s/[, ]/\n/g'|sort|uniq|xargs|sed 's/ .*//g'`
+
+API=`grep_prop ro.build.version.sdk $BUILD_PROP`
+
+#https://developer.android.com/ndk/guides/abis.html
+case $ABI in
+ armeabi|armeabi-v7a)	ARCH=arm;;
+ arm64-v8a)		ARCH=arm64;;
+ x86)			ARCH=$ABI;;
+# x86-64)		ARCH=x64;;
+# mips)			ARCH=$ABI;;
+# mips64)		ARCH=$ABI;;
+ *)			ui_print_exit "! Failed: $ABI is not supported";;
+esac
+
+ui_print "- UnZipping into TMPDIR"
+mkdir -p "$TMPDIR"
+unzip -o $ZIP -d "$TMPDIR" -x "META-INF/*"
+[ $? -eq 0 ] || ui_print_exit "! Failed: Unable to extract zip file!(0)"
+
+##########################################################################################
+# Building Xposed Filesystem Image
+##########################################################################################
+[ ! -d $IMGDIR ] \
+  && mkdir -p $IMGDIR
+
+mountpoint -q $IMGDIR \
+  && umount $IMGDIR
+
+IMG=$TMPDIR/build.img
+
+SEARCH="xposed-v*-sdk${API}-${ARCH}.zip"
+VERSION=`find $ZIPDIR -type f -iname "$SEARCH" -maxdepth 2|\sed 's/^.*xposed-v//'|sort -n|tail -1`
+XPOSEDZIP=`find $ZIPDIR -type f -iname "xposed-v$VERSION"`
+
+[ -z $XPOSEDZIP ] \
+ &&  ui_print_exit "! File not found: $SEARCH"
+
+IMGSIZE=`unzip -l $XPOSEDZIP |tail -1|\
+         awk '{printf("%.0f\n", (x == int($1/1024/1024)) ? x : int($1/1024/1024)+6) }'`
+
+[ -z $IMAGESIZE ] || [ $IMGSIZE -le 6 ] \
+ && uit_print_exit "! Failed: $XPOSEDZIP is corrupt"
+
+printf "${IMGDIR}(/.*)? u:object_r:system_file:s0\n">"$TMPDIR/file_contexts_image"
+ui_print "- Building new image: $IMG (${IMGSIZE}M)"
+make_ext4fs -l "${IMGSIZE}M" -a $IMGDIR -S "$TMPDIR/file_contexts_image" $IMG
+chcon u:object_r:system_data_file:s0 $IMG
+chmod 600 $IMG
+
+ui_print "- Mounting $IMG to $IMGDIR"
+mount -t ext4 -o,rw,noatime $IMG $IMGDIR
+[ $? -eq 0 ] \
+  || ui_print_exit "! Failed: Unable to mount $IMGDIR"
+
+ui_print "- UnZipping 'xposed-v$VERSION' into $IMGDIR"
+
+unzip -o $XPOSEDZIP -d $IMGDIR "system/*"
+[ $? -eq 0 ] || ui_print_exit "! Failed: Unable to extract zip file!(1)"
+
+mv $IMGDIR/system/* /xposed && rmdir $IMGDIR/system
+
+find $IMGDIR -type d|while read dir ;do chown 0:0 $dir ;chmod 0755 $dir ;done
+
+find $IMGDIR -type f -name 'app_process*'|while read file;do mv -f $file ${file%_xposed};done
+
+find $IMGDIR -type f|while read file;do
+
+  CHOWN=0:0
+  CHMOD=644
+  CHCON=u:object_r:system_file:s0
+
+  original=/system/${file#/xposed/}
+  if [ -f $original ];then
+    CHOWN=$(ls -n $original|awk '{print $3":"$4}')
+    RWX=`ls -la $original |awk '{print $1}'`
+    CHMOD="u=${RWX:1:3},g=${RWX:4:3},o=${RWX:7:3}"
+    CHCON=$(ls -Z $original|awk '{print $2}')
+  fi
+
+  case $file in
+    /xposed/bin/app_process*)
+      ui_print "- Applying systemless patch to: $file"
+      sed -i 's#/system/lib64/libxposed_art.so#/xposed/lib64/libxposed_art.so#g' $file
+      sed -i 's#/system/lib/libxposed_art.so#/xposed/lib/libxposed_art.so#g' $file
+      sed -i 's#/system/framework/XposedBridge.jar#/xposed/framework/XposedBridge.jar#g' $file
+      sed -i 's#/system/xposed.prop#/xposed/xposed.prop#g' $file
+      ;;
+    /xposed/xposed.prop)
+      sed -i "/version/s/$/ (systemless $VER by $AUT)/" $file
+      ;;
+  esac
+
+  chown $CHOWN $file
+  chmod $CHMOD $file
+  chcon $CHCON $file
+
+done
+
+umount $IMGDIR
+
+mountpoint -q /data \
+  && cp -f $IMG "/data/$IMGNAME" \
+  || cp -f $IMG "/cache/$IMGNAME"
+
+##########################################################################################
+# Boot image patch
+##########################################################################################
+ui_print " "
+ui_print "******************"
+ui_print "Boot image patcher"
+ui_print "******************"
+
+SUKERNEL=$TMPDIR/bin/sukernel-$ARCH
+[ -f $SUKERNEL ] && chmod +x $SUKERNEL || ui_print_exit "! SUKERNEL not found"
+
+FUTILITY=$TMPDIR/bin/futility
+[ -f $FUTILITY ] && chmod +x $FUTILITY || ui_print_exit "! FUTILITY not found"
+
+BOOTPARTITION=`readlink $(find /dev/block -type l|grep -iE 'kern-a|android_boot|kernel|boot|lnx')`
+[ -z ${BOOTPARTITION} ] \
+  && ui_print_exit "! Failed: Boot partition NOT found." \
+  || ui_print "- Found boot partition: $BOOTPARTITION"
+
+ui_print "- Reading boot partition..."
+dd bs=4096 if=$BOOTPARTITION of="$TMPDIR/boot.img"
+[ $? == 0 ] \
+  && ui_print "> Success" \
+  || ui_print_exit "! Failed"
+
+#Exitcode: 0/error, 1/Android, 2/ChromeOS
+$SUKERNEL --bootimg-type $TMPDIR/boot.img
+case $? in
+ 1)	IMAGETYPE="android";;
+ 2)	IMAGETYPE="chromeos";;
+ *)	ui_print_exit "! Failed (type=$IMGTYPE) (exit:[$?])";;
+esac
+
+ui_print "- Boot image type: $IMGTYPE"
+
+if [ "$IMGTYPE" = "chromeos" ]; then
+  ui_print "- ChromeOS: Extracting vmlinuz"
+  $FUTILITY vbutil_kernel \
+    --get-vmlinuz $TMPDIR/boot.img \
+    --vmlinuz-out $TMPDIR/boot.chromeos.img
+  mv -f $TMPDIR/boot.chromeos.img $TMPDIR/boot.img
+fi
+
+ui_print "- Patching ramdisk"
+$SUKERNEL --bootimg-extract-ramdisk $TMPDIR/boot.img $TMPDIR/ramdisk.gz
+$SUKERNEL --ungzip $TMPDIR/ramdisk.gz $TMPDIR/ramdisk
+$SUKERNEL --cpio-extract $TMPDIR/ramdisk init.rc $TMPDIR/init.rc
+
+
+if [ $(grep -c "import /init.xposed.rc" $TMPDIR/init.rc) == 0 ]; then
+ sed -i "\#import /init.environ.rc#iimport /init.xposed.rc" $TMPDIR/init.rc
+else
+ ui_print "! Warning: init.rc already patched"
+fi
+
+$SUKERNEL --cpio-mkdir $TMPDIR/ramdisk $TMPDIR/ramdisk 755 xposed
+$SUKERNEL --cpio-add $TMPDIR/ramdisk $TMPDIR/ramdisk 750 init.rc $TMPDIR/init.rc
+$SUKERNEL --cpio-add $TMPDIR/ramdisk $TMPDIR/ramdisk 750 init.xposed.rc $TMPDIR/common/init.xposed.rc
+$SUKERNEL --cpio-add $TMPDIR/ramdisk $TMPDIR/ramdisk 700 sbin/mount_xposed.sh $TMPDIR/common/mount_xposed.sh
+
+ui_print "- Building new boot image"
+$SUKERNEL --gzip $TMPDIR/ramdisk $TMPDIR/ramdisk.gz
+$SUKERNEL --bootimg-replace-ramdisk $TMPDIR/boot.img $TMPDIR/ramdisk.gz $TMPDIR/new_boot.img
+
+if [ "$IMGTYPE" = "chromeos" ]; then
+  ui_print "- ChromeOS: signing boot image"
+  $FUTILITY vbutil_kernel \
+    --pack $TMPDIR/new_boot.img.signed \
+    --keyblock $TMPDIR/chromeos/kernel.keyblock \
+    --signprivate $TMPDIR/chromeos/kernel_data_key.vbprivk \
+    --version 1 \
+    --vmlinuz $TMPDIR/new_boot.img \
+    --config $TMPDIR/chromeos/kernel.config \
+    --arch arm \
+    --bootloader $TMPDIR/chromeos/kernel.bootloader \
+    --flags 0x1
+  mv -f $TMPDIR/new_boot.img.signed $TMPDIR/new_boot.img
+fi
+
+ui_print "- Syncing data"
+sync
+
+ui_print "- Flashing new boot image"
+dd if=$TMPDIR/new_boot.img of=$BOOTPARTITION
+[ $? -eq 0 ] || ui_print "! ERROR: Flashing failed"
+
+##########################################################################################
+# Installing XposedInstaller
+##########################################################################################
+ui_print " "
+ui_print "******************"
+ui_print "Package installer"
+ui_print "******************"
+
+SEARCH="*xposed*installer*.apk"
+APKFILE=`find $ZIPDIR -type f -iname "$SEARCH" -maxdepth 2|head -1`
+
+if [ ! -f $APKFILE ]; then
+ ui_print "! Skipping install: $APKFILE not found."
+else
+ ui_print "- Installing: '$SEARCH'"
+ APKNAME=`aapt dump badging "$APKFILE"|grep package|sed "s/^package: name='//;s/' .*$//"`
+ APPDIR=/data/app/$APKNAME-1
+ [ -d $APPDIR ] || mkdir -p $APPDIR
+ [ -f $APPDIR/base.apk ] || cp -f $APKFILE $APPDIR/base.apk
+ set_perm u:object_r:apk_data_file:s0 755 1000 1000 $APPDIR
+ set_perm u:object_r:apk_data_file:s0 644 1000 1000 $APPDIR/base.apk
+fi
+
+##########################################################################################
+ui_print " "
+ui_print "Done"
+exit 0
+
+
