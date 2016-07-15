@@ -32,13 +32,13 @@
 </BR>
 <B>How to install</B></BR>
 * <I>WARNING:</I> it will overwrite /data/xposed.img without prompt!</BR>
-1. download the xposed-usi-v*.zip</BR>
-2. download the proper xposed-v*-sdk*-*.zip version for your device</BR>
-   and place it alongside or in a subfolder (auto-detect)</BR>
-3. download the XposedInstaller_by_dvdandroid.apk</BR>
-   and place it alongside or in a subfolder (auto-detect)</BR>
-4. install the xposed-usi-v*.zip</BR>
-5. reboot</BR>
+  - download the xposed-usi-v*.zip</BR>
+  - download the proper xposed-v*-sdk*-*.zip version for your device</BR>
+  and place it alongside or in a subfolder (auto-detect)</BR>
+  - download the XposedInstaller_by_dvdandroid.apk</BR>
+  and place it alongside or in a subfolder (auto-detect)</BR>
+  - install the xposed-usi-v*.zip</BR>
+  reboot</BR>
 </BR>
 <B>How do i know what version of xposed i need ?</B></BR>
   run the xposed installer by dvdandroid</BR>
