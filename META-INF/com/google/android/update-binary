@@ -133,7 +133,7 @@ mountpoint -q $IMGDIR \
 
 IMG=$TMPDIR/build.img
 
-SEARCH="xposed-v*-sdk${API}-${ARCH}.zip"
+SEARCH="xposed-v*-sdk${API}-${ARCH}*.zip"
 VERSION=`find $ZIPDIR -type f -iname "$SEARCH" -maxdepth 2|\sed 's/^.*xposed-v//'|sort -n|tail -1`
 XPOSEDZIP=`find $ZIPDIR -type f -iname "xposed-v$VERSION"`
 
