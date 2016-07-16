@@ -47,7 +47,7 @@ both will show which version you need</BR>
 </BR>
 <B>Bugs/problems:</B></BR>
 probably, i only have one device</BR>
-post to this forum thread</BR>
+forum thread: http://forum.xda-developers.com/xposed/unofficial-universal-systemless-t3419472 </BR>
 </BR> 
 <B>Donate:</B></BR>
 * bitcoin address: 1HPRug5MFDp2eA3rr4kDEhV1gEguinRnpQ</BR>
