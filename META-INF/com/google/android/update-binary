@@ -15,6 +15,7 @@
 ##########################################################################################
 # Changelog
 ##########################################################################################
+# v0.1c - added support for custom xposed frameworks and xposed installers
 # v0.1b - added auto installation of material-design-xposed-installer
 # v0.1a - initial alpha non-public release
 #       - 
@@ -38,7 +39,7 @@ IMGDIR="/xposed"
 IMGNAME="xposed.img"
 APP="Universal Systemless Installer for Xposed Framework"
 AUT="st0rm"
-VER="0.1b"
+VER="0.1c"
 LIC="GPL v2"
 
 ##########################################################################################
@@ -133,7 +134,7 @@ mountpoint -q $IMGDIR \
 
 IMG=$TMPDIR/build.img
 
-SEARCH="xposed-v*-sdk${API}-${ARCH}*.zip"
+SEARCH="xposed-v*-sdk${API}-${ARCH}-*.zip"
 VERSION=`find $ZIPDIR -type f -iname "$SEARCH" -maxdepth 2|\sed 's/^.*xposed-v//'|sort -n|tail -1`
 XPOSEDZIP=`find $ZIPDIR -type f -iname "xposed-v$VERSION"`
 
