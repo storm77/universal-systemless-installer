@@ -55,8 +55,8 @@ mountpoint -q /system && umount /system
 exit
 ' 0 1 2 3 15
 
-LOGSIZE=`wc -c < /tmp/recovery.log`
-rm $ZIP.log
+#LOGSIZE=`wc -c < /tmp/recovery.log`
+#[ -f $ZIP.log ] && rm $ZIP.log
 
 ##########################################################################################
 # Functions
