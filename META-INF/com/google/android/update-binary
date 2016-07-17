@@ -293,7 +293,7 @@ ui_print "- Syncing data"
 sync
 
 ui_print "- Flashing new boot image"
-dd if=$TMPDIR/new_boot.img of=$BOOTPARTITION
+dd bs=4096 if=$TMPDIR/new_boot.img of=$BOOTPARTITION
 [ $? -eq 0 ] || ui_print "! ERROR: Flashing failed"
 
 ##########################################################################################
