@@ -10,25 +10,22 @@
 #    but WITHOUT ANY WARRANTY; without even the implied warranty of
 #    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #    GNU General Public License for more details.
-#
 
 ##########################################################################################
 # Changelog
 ##########################################################################################
+# v0.1d - fixed some bugs
 # v0.1c - added support for custom xposed frameworks and xposed installers
 # v0.1b - added auto installation of material-design-xposed-installer
 # v0.1a - initial alpha non-public release
-# 
 
 ##########################################################################################
 # Urls/Credits
 ##########################################################################################
-# rovo89     - xposed framework         - http://dl-xda.xposed.info/framework
-# chainfire  - systemless idea & tools  - http://download.chainfire.eu/supersu
-# topjohnwu  - systemless xposed idea   - http://topjohnwu.github.io/
-# dvdandroid - xposed-installer         - https://github.com/dvdandroid/XposedInstaller
-# romracer   - xposed-installer         - https://github.com/romracer/Xposed
-#
+# http://dl-xda.xposed.info/framework 		: rovo89 - xposed framework
+# http://download.chainfire.eu/supersu 		: chainfire - systemless idea & tools
+# http://topjohnwu.github.io/ 			: topjohnwu - systemless xposed idea
+# https://github.com/dvdandroid/XposedInstaller : dvdandroid - xposed-installer
 
 ##########################################################################################
 # Variables
@@ -41,7 +38,7 @@ IMGDIR="/xposed"
 IMGNAME="xposed.img"
 APP="Universal Systemless Installer for Xposed Framework"
 AUT="st0rm"
-VER="0.1c"
+VER="0.1d"
 LIC="GPL v2"
 
 ##########################################################################################
@@ -136,8 +133,8 @@ mountpoint -q $IMGDIR \
 
 IMG=$TMPDIR/build.img
 
-SEARCH="xposed-v*-sdk${API}-${ARCH}-*.zip"
-VERSION=`find $ZIPDIR -type f -iname "$SEARCH" -maxdepth 2|\sed 's/^.*xposed-v//'|sort -n|tail -1`
+SEARCH="xposed-v*-sdk${API}-${ARCH}.zip"
+VERSION=`find $ZIPDIR -type f -iname "$SEARCH" -maxdepth 2|sed 's/^.*xposed-v//'|sort -n|tail -1`
 XPOSEDZIP=`find $ZIPDIR -type f -iname "xposed-v$VERSION"`
 
 [ -z $XPOSEDZIP ] \
@@ -160,12 +157,14 @@ mount -t ext4 -o,rw,noatime $IMG $IMGDIR
 [ $? -eq 0 ] \
   || ui_print_exit "! Failed: Unable to mount $IMGDIR"
 
+rmdir "$IMGDIR/lost+found"
+
 ui_print "- UnZipping 'xposed-v$VERSION' into $IMGDIR"
 
 unzip -o $XPOSEDZIP -d $IMGDIR "system/*"
 [ $? -eq 0 ] || ui_print_exit "! Failed: Unable to extract zip file!(1)"
 
-mv $IMGDIR/system/* /xposed && rmdir $IMGDIR/system
+mv $IMGDIR/system/* $IMGDIR && rmdir $IMGDIR/system
 
 find $IMGDIR -type d|while read dir ;do chown 0:0 $dir ;chmod 0755 $dir ;done
 
@@ -177,7 +176,7 @@ find $IMGDIR -type f|while read file;do
   CHMOD=644
   CHCON=u:object_r:system_file:s0
 
-  original=/system/${file#/xposed/}
+  original=/system/${file#$IMGDIR/}
   if [ -f $original ];then
     CHOWN=$(ls -n $original|awk '{print $3":"$4}')
     RWX=`ls -la $original |awk '{print $1}'`
@@ -238,8 +237,8 @@ dd bs=4096 if=$BOOTPARTITION of="$TMPDIR/boot.img"
 #Exitcode: 0/error, 1/Android, 2/ChromeOS
 $SUKERNEL --bootimg-type $TMPDIR/boot.img
 case $? in
- 1)	IMAGETYPE="android";;
- 2)	IMAGETYPE="chromeos";;
+ 1)	IMGTYPE="android";;
+ 2)	IMGTYPE="chromeos";;
  *)	ui_print_exit "! Failed (type=$IMGTYPE) (exit:[$?])";;
 esac
 
@@ -250,14 +249,14 @@ if [ "$IMGTYPE" = "chromeos" ]; then
   $FUTILITY vbutil_kernel \
     --get-vmlinuz $TMPDIR/boot.img \
     --vmlinuz-out $TMPDIR/boot.chromeos.img
-  mv -f $TMPDIR/boot.chromeos.img $TMPDIR/boot.img
+  mv -f $TMPDIR/boot.chromeos.img $TMPDIR/boot.img \
+    || ui_print_exit "! Failed"
 fi
 
 ui_print "- Patching ramdisk"
 $SUKERNEL --bootimg-extract-ramdisk $TMPDIR/boot.img $TMPDIR/ramdisk.gz
 $SUKERNEL --ungzip $TMPDIR/ramdisk.gz $TMPDIR/ramdisk
 $SUKERNEL --cpio-extract $TMPDIR/ramdisk init.rc $TMPDIR/init.rc
-
 
 if [ $(grep -c "import /init.xposed.rc" $TMPDIR/init.rc) == 0 ]; then
  sed -i "\#import /init.environ.rc#iimport /init.xposed.rc" $TMPDIR/init.rc
@@ -286,15 +285,23 @@ if [ "$IMGTYPE" = "chromeos" ]; then
     --arch arm \
     --bootloader $TMPDIR/chromeos/kernel.bootloader \
     --flags 0x1
-  mv -f $TMPDIR/new_boot.img.signed $TMPDIR/new_boot.img
+  mv -f $TMPDIR/new_boot.img.signed $TMPDIR/new_boot.img \
+    || ui_print_exit "! Failed"
 fi
 
 ui_print "- Syncing data"
 sync
 
-ui_print "- Flashing new boot image"
+ui_print "- Writing boot partition..."
 dd bs=4096 if=$TMPDIR/new_boot.img of=$BOOTPARTITION
-[ $? -eq 0 ] || ui_print "! ERROR: Flashing failed"
+if [ $? -ne 0 ];then
+  dd bs=4096 if=$TMPDIR/boot.img of=$BOOTPARTITION
+  [ $? -ne 0 ] \
+    && ui_print_exit "!Failed to flash, failed to restore" \
+    || ui_print_exit "!Failed to flash, restore succeeded"
+else
+  ui_print "> Success"
+fi
 
 ##########################################################################################
 # Installing XposedInstaller
@@ -323,5 +330,3 @@ fi
 ui_print " "
 ui_print "Done"
 exit 0
-
-
