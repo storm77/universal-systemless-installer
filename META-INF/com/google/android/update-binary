@@ -14,6 +14,7 @@
 ##########################################################################################
 # Changelog
 ##########################################################################################
+# v0.1e - changed bootpartition detection
 # v0.1d - fixed some bugs
 # v0.1c - added support for custom xposed frameworks and xposed installers
 # v0.1b - added auto installation of material-design-xposed-installer
@@ -38,7 +39,7 @@ IMGDIR="/xposed"
 IMGNAME="xposed.img"
 APP="Universal Systemless Installer for Xposed Framework"
 AUT="st0rm"
-VER="0.1d"
+VER="0.1e"
 LIC="GPL v2"
 
 ##########################################################################################
