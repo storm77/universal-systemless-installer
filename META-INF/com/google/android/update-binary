@@ -51,11 +51,12 @@ unset LD_LIBRARY_PATH
 mountpoint -q $IMGDIR && umount $IMGDIR
 mountpoint -q /system && umount /system
 #[ -f /tmp/recovery.log ] && cat /tmp/recovery.log|tail -c+$LOGSIZE > $ZIP.log
+[ -f /tmp/recovery.log ] && cp /tmp/recovery.log $ZIP.log
 exit
 ' 0 1 2 3 15
 
 #LOGSIZE=`wc -c < /tmp/recovery.log`
-#[ -f $ZIP.log ] && rm $ZIP.log
+[ -f $ZIP.log ] && rm $ZIP.log
 
 ##########################################################################################
 # Functions
@@ -82,20 +83,21 @@ ui_print "******************************"
 # Mounting
 ##########################################################################################
 ui_print "- Mounting /system(ro), /cache, /data"
-mount -o,ro /system
-mount /cache
-mount /data
+mountpoint -q /system || mount -o,ro /system || ui_print_exit "! Failed, unable to mount /system"
+mountpoint -q /cache  || mount /cache || ui_print "! Warning, unable to mount /cache"
+mountpoint -q /data   || mount /data || ui_print "! Warning, unable to mount /data"
 
-ui_print "- Setting library path"
+[ mountpoint -q /cache ] && [ mountpoint -q /data ] \
+  && ui_print_exit "! Failed, no partitions available"
+
 [ -d /system/lib64 ] \
   && LD_LIBRARY_PATH=/system/lib64 \
   || LD_LIBRARY_PATH=/system/lib
+ui_print "- Setting library path: $LD_LIBRARY_PATH"
 
 ##########################################################################################
 # Prerequisites
 ##########################################################################################
-
-ui_print "- Checking cpu architecture"
 
 BUILD_PROP="/system/build.prop"
 [ ! -f $BUILD_PROP ] \
@@ -116,6 +118,8 @@ case $ABI in
 # mips64)		ARCH=$ABI;;
  *)			ui_print_exit "! Failed: $ABI is not supported";;
 esac
+
+ui_print "- Cpu architecture: $ABI=$ARCH , SDK: $API"
 
 ui_print "- UnZipping into TMPDIR"
 mkdir -p "$TMPDIR"
@@ -223,7 +227,14 @@ SUKERNEL=$TMPDIR/bin/sukernel-$ARCH
 FUTILITY=$TMPDIR/bin/futility
 [ -f $FUTILITY ] && chmod +x $FUTILITY || ui_print_exit "! FUTILITY not found"
 
-BOOTPARTITION=`readlink $(find /dev/block -type l|grep -iE 'kern-a|android_boot|kernel|boot|lnx')`
+#BOOTPARTITION=`readlink $(find /dev/block -type l|grep -iE 'kern-a|android_boot|kernel|boot|lnx')`
+#[ -z ${BOOTPARTITION} ] \
+#  && ui_print_exit "! Failed: Boot partition NOT found." \
+#  || ui_print "- Found boot partition: $BOOTPARTITION"
+
+for p in `find /dev/block -type l|grep -iE 'kern-a|android_boot|kernel|boot|lnx'`;do
+ BOOTPARTITION=`readlink $p`;[ -z $BOOTPARTITION ]||break
+done
 [ -z ${BOOTPARTITION} ] \
   && ui_print_exit "! Failed: Boot partition NOT found." \
   || ui_print "- Found boot partition: $BOOTPARTITION"
