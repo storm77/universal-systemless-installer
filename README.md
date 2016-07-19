@@ -20,6 +20,7 @@
 * http://topjohnwu.github.io/                    - topjohnwu / systemless xposed idea
 * https://github.com/dvdandroid/XposedInstaller  - dvdandroid / xposed-installer
 </BR>
+</BR>
 <B>Many thanks to testers:</B></BR>
 * Minions_Army
 </BR>
