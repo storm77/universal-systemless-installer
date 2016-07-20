@@ -19,8 +19,7 @@
 * http://download.chainfire.eu/supersu           - chainfire / systemless idea & tools
 * http://topjohnwu.github.io/                    - topjohnwu / systemless xposed idea
 * https://github.com/dvdandroid/XposedInstaller  - dvdandroid / xposed-installer
-* http://forum.xda-developers.com/xposed/        - romracer / systemless xposed
-super-alpha-posted-permission-xposed-t3072979
+* http://forum.xda-developers.com/xposed/super-alpha-posted-permission-xposed-t3072979 - romracer / systemless xposed
 </BR>
 </BR>
 <B>Many thanks to testers:</B></BR>
