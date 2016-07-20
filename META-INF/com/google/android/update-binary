@@ -14,6 +14,7 @@
 ##########################################################################################
 # Changelog
 ##########################################################################################
+# v0.1f - changed abi to abilist detection since sdk21+ uses
 # v0.1e - changed bootpartition detection
 # v0.1d - fixed some bugs
 # v0.1c - added support for custom xposed frameworks and xposed installers
@@ -39,7 +40,7 @@ IMGDIR="/xposed"
 IMGNAME="xposed.img"
 APP="Universal Systemless Installer for Xposed Framework"
 AUT="st0rm"
-VER="0.1e"
+VER="0.1f"
 LIC="GPL v2"
 
 ##########################################################################################
@@ -64,7 +65,7 @@ exit
 ##########################################################################################
 ui_print(){ printf "ui_print $*\n\n">$OUTFD;}
 ui_print_exit(){ printf "ui_print $*\n\n">$OUTFD;exit 1;}
-grep_prop(){ grep "^$1=" $2|sed "s/.*=//g";}
+grep_prop(){ grep "^$1=" $2|sed "s/^.*=//g";}
 set_perm(){ chcon $1 $5 && chmod $2 $5 && chown $3:$4 $5;}
 
 ##########################################################################################
@@ -83,13 +84,11 @@ ui_print "******************************"
 ##########################################################################################
 # Mounting
 ##########################################################################################
-ui_print "- Mounting /system(ro), /cache, /data"
-mountpoint -q /system || mount -o,ro /system || ui_print_exit "! Failed, unable to mount /system"
-mountpoint -q /cache  || mount /cache || ui_print "! Warning, unable to mount /cache"
-mountpoint -q /data   || mount /data || ui_print "! Warning, unable to mount /data"
-
-[ mountpoint -q /cache ] && [ mountpoint -q /data ] \
-  && ui_print_exit "! Failed, no partitions available"
+ui_print "- Mounting /system(ro), /data, /cache"
+mountpoint -q /system || mount -o,ro /system \
+ || ui_print_exit "! Failed, unable to mount /system"
+mountpoint -q /data || mount /data || mountpoint -q /cache || mount /cache \
+ || ui_print_exit "!Failed, unable to mount /data or /cache"
 
 [ -d /system/lib64 ] \
   && LD_LIBRARY_PATH=/system/lib64 \
@@ -104,23 +103,24 @@ BUILD_PROP="/system/build.prop"
 [ ! -f $BUILD_PROP ] \
   && ui_print_exit "! Failed: build.prop not found"
 
-ABI=`grep ^ro.product.cpu.abi $BUILD_PROP|\
-     sed 's/.*=/\n/;s/[, ]/\n/g'|sort|uniq|xargs|sed 's/ .*//g'`
+ABI=`grep_prop ro.product.cpu.abilist $BUILD_PROP|sed 's/,/\n/g'|head -1`
 
 API=`grep_prop ro.build.version.sdk $BUILD_PROP`
 
 #https://developer.android.com/ndk/guides/abis.html
+#translation to rovo89 xposed releases
 case $ABI in
- armeabi|armeabi-v7a)	ARCH=arm;;
+ armeabi)		ARCH=arm;;
+ armeabi-v7a)		ARCH=arm;;
  arm64-v8a)		ARCH=arm64;;
  x86)			ARCH=$ABI;;
-# x86-64)		ARCH=x64;;
-# mips)			ARCH=$ABI;;
-# mips64)		ARCH=$ABI;;
- *)			ui_print_exit "! Failed: $ABI is not supported";;
+ x86_64)		ARCH=$ABI;;
+ mips)			ARCH=$ABI;;
+ mips64)		ARCH=$ABI;;
+ *)			ui_print_exit "! Failed: $ABI is not supported (yet)";;
 esac
 
-ui_print "- Cpu architecture: $ABI=$ARCH , SDK: $API"
+ui_print "- Cpu architecture: $ABI/$ARCH, sdk$API"
 
 ui_print "- UnZipping into TMPDIR"
 mkdir -p "$TMPDIR"
@@ -215,6 +215,32 @@ mountpoint -q /data \
   || cp -f $IMG "/cache/$IMGNAME"
 
 ##########################################################################################
+# Installing XposedInstaller
+##########################################################################################
+ui_print " "
+ui_print "******************"
+ui_print "Package installer"
+ui_print "******************"
+
+SEARCH="*xposed*installer*.apk"
+APKFILE=`find $ZIPDIR -type f -iname "$SEARCH" -maxdepth 2|head -1`
+
+if [ ! -f $APKFILE ]; then
+ ui_print "! Skipping install: $APKFILE not found."
+else
+ APKNAME=`aapt dump badging "$APKFILE"|grep package|sed "s/^package: name='//;s/' .*$//"`
+ ui_print "- Installing: '${APKFILE##*/}'"
+ mountpoint -q /data \
+  && APPDIR=/data/app/$APKNAME-1 \
+  || APPDIR=/cache/app/$APKNAME-1
+
+ [ -d $APPDIR ] || mkdir -p $APPDIR
+ [ -f $APPDIR/base.apk ] || cp -f $APKFILE $APPDIR/base.apk
+ set_perm u:object_r:apk_data_file:s0 755 1000 1000 $APPDIR
+ set_perm u:object_r:apk_data_file:s0 644 1000 1000 $APPDIR/base.apk
+fi
+
+##########################################################################################
 # Boot image patch
 ##########################################################################################
 ui_print " "
@@ -222,20 +248,11 @@ ui_print "******************"
 ui_print "Boot image patcher"
 ui_print "******************"
 
-SUKERNEL=$TMPDIR/bin/sukernel-$ARCH
+SUKERNEL=$TMPDIR/$ABI/sukernel
 [ -f $SUKERNEL ] && chmod +x $SUKERNEL || ui_print_exit "! SUKERNEL not found"
 
-FUTILITY=$TMPDIR/bin/futility
-[ -f $FUTILITY ] && chmod +x $FUTILITY || ui_print_exit "! FUTILITY not found"
-
-#BOOTPARTITION=`readlink $(find /dev/block -type l|grep -iE 'kern-a|android_boot|kernel|boot|lnx')`
-#[ -z ${BOOTPARTITION} ] \
-#  && ui_print_exit "! Failed: Boot partition NOT found." \
-#  || ui_print "- Found boot partition: $BOOTPARTITION"
-
 for p in `find /dev/block -type l|grep -iE 'kern-a|android_boot|kernel|boot|lnx'`;do
- BOOTPARTITION=`readlink $p`;[ -z $BOOTPARTITION ]||break
-done
+ BOOTPARTITION=`readlink $p`;[ -z $BOOTPARTITION ]||break;done
 [ -z ${BOOTPARTITION} ] \
   && ui_print_exit "! Failed: Boot partition NOT found." \
   || ui_print "- Found boot partition: $BOOTPARTITION"
@@ -257,6 +274,9 @@ esac
 ui_print "- Boot image type: $IMGTYPE"
 
 if [ "$IMGTYPE" = "chromeos" ]; then
+  FUTILITY=$TMPDIR/$ABI/chromeos/futility
+  [ -f $FUTILITY ] && chmod +x $FUTILITY || ui_print_exit "! FUTILITY not found"
+
   ui_print "- ChromeOS: Extracting vmlinuz"
   $FUTILITY vbutil_kernel \
     --get-vmlinuz $TMPDIR/boot.img \
@@ -268,16 +288,18 @@ fi
 ui_print "- Patching ramdisk"
 $SUKERNEL --bootimg-extract-ramdisk $TMPDIR/boot.img $TMPDIR/ramdisk.gz
 $SUKERNEL --ungzip $TMPDIR/ramdisk.gz $TMPDIR/ramdisk
-$SUKERNEL --cpio-extract $TMPDIR/ramdisk init.rc $TMPDIR/init.rc
+$SUKERNEL --cpio-extract $TMPDIR/ramdisk sepolicy $TMPDIR/sepolicy
 
+$SUKERNEL --cpio-extract $TMPDIR/ramdisk init.rc $TMPDIR/init.rc
 if [ $(grep -c "import /init.xposed.rc" $TMPDIR/init.rc) == 0 ]; then
  sed -i "\#import /init.environ.rc#iimport /init.xposed.rc" $TMPDIR/init.rc
+ $SUKERNEL --cpio-add $TMPDIR/ramdisk $TMPDIR/ramdisk 750 init.rc $TMPDIR/init.rc
+ ui_print "  > init.rc"
 else
- ui_print "! Warning: init.rc already patched"
+ ui_print "  ! Skipping: init.rc (already patched)"
 fi
 
 $SUKERNEL --cpio-mkdir $TMPDIR/ramdisk $TMPDIR/ramdisk 755 xposed
-$SUKERNEL --cpio-add $TMPDIR/ramdisk $TMPDIR/ramdisk 750 init.rc $TMPDIR/init.rc
 $SUKERNEL --cpio-add $TMPDIR/ramdisk $TMPDIR/ramdisk 750 init.xposed.rc $TMPDIR/common/init.xposed.rc
 $SUKERNEL --cpio-add $TMPDIR/ramdisk $TMPDIR/ramdisk 700 sbin/mount_xposed.sh $TMPDIR/common/mount_xposed.sh
 
@@ -289,13 +311,13 @@ if [ "$IMGTYPE" = "chromeos" ]; then
   ui_print "- ChromeOS: signing boot image"
   $FUTILITY vbutil_kernel \
     --pack $TMPDIR/new_boot.img.signed \
-    --keyblock $TMPDIR/chromeos/kernel.keyblock \
-    --signprivate $TMPDIR/chromeos/kernel_data_key.vbprivk \
+    --keyblock $TMPDIR/common/chromeos/kernel.keyblock \
+    --signprivate $TMPDIR/common/chromeos/kernel_data_key.vbprivk \
     --version 1 \
     --vmlinuz $TMPDIR/new_boot.img \
-    --config $TMPDIR/chromeos/kernel.config \
+    --config $TMPDIR/common/chromeos/kernel.config \
     --arch arm \
-    --bootloader $TMPDIR/chromeos/kernel.bootloader \
+    --bootloader $TMPDIR/common/chromeos/kernel.bootloader \
     --flags 0x1
   mv -f $TMPDIR/new_boot.img.signed $TMPDIR/new_boot.img \
     || ui_print_exit "! Failed"
@@ -310,32 +332,9 @@ if [ $? -ne 0 ];then
   dd bs=4096 if=$TMPDIR/boot.img of=$BOOTPARTITION
   [ $? -ne 0 ] \
     && ui_print_exit "!Failed to flash, failed to restore" \
-    || ui_print_exit "!Failed to flash, restore succeeded"
+    || ui_print_exit "!Failed to flash, restored backup"
 else
   ui_print "> Success"
-fi
-
-##########################################################################################
-# Installing XposedInstaller
-##########################################################################################
-ui_print " "
-ui_print "******************"
-ui_print "Package installer"
-ui_print "******************"
-
-SEARCH="*xposed*installer*.apk"
-APKFILE=`find $ZIPDIR -type f -iname "$SEARCH" -maxdepth 2|head -1`
-
-if [ ! -f $APKFILE ]; then
- ui_print "! Skipping install: $APKFILE not found."
-else
- ui_print "- Installing: '$SEARCH'"
- APKNAME=`aapt dump badging "$APKFILE"|grep package|sed "s/^package: name='//;s/' .*$//"`
- APPDIR=/data/app/$APKNAME-1
- [ -d $APPDIR ] || mkdir -p $APPDIR
- [ -f $APPDIR/base.apk ] || cp -f $APKFILE $APPDIR/base.apk
- set_perm u:object_r:apk_data_file:s0 755 1000 1000 $APPDIR
- set_perm u:object_r:apk_data_file:s0 644 1000 1000 $APPDIR/base.apk
 fi
 
 ##########################################################################################
