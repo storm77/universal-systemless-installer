@@ -149,7 +149,7 @@ IMGSIZE=`unzip -l $XPOSEDZIP |tail -1|\
          awk '{printf("%.0f\n", (x == int($1/1024/1024)) ? x : int($1/1024/1024)+6) }'`
 
 [ -z $IMAGESIZE ] || [ $IMGSIZE -le 6 ] \
- && uit_print_exit "! Failed: $XPOSEDZIP is corrupt"
+ && ui_print_exit "! Failed: $XPOSEDZIP is corrupt"
 
 printf "${IMGDIR}(/.*)? u:object_r:system_file:s0\n">"$TMPDIR/file_contexts_image"
 ui_print "- Building new image: $IMG (${IMGSIZE}M)"
