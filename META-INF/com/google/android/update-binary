@@ -14,7 +14,8 @@
 ##########################################################################################
 # Changelog
 ##########################################################################################
-# v0.1f - changed abi to abilist detection since its all sdk21+
+# v0.1g - changed imgsize detection, fixed ui_print, some minor bugs and typo's 
+# v0.1f - changed abi to abilist detection since sdk21+ uses
 # v0.1e - changed bootpartition detection
 # v0.1d - fixed some bugs
 # v0.1c - added support for custom xposed frameworks and xposed installers
@@ -42,7 +43,7 @@ IMGDIR="/xposed"
 IMGNAME="xposed.img"
 APP="Universal Systemless Installer for Xposed Framework"
 AUT="st0rm"
-VER="0.1f"
+VER="0.1g"
 LIC="GPL v2"
 
 ##########################################################################################
@@ -65,8 +66,8 @@ exit
 ##########################################################################################
 # Functions
 ##########################################################################################
-ui_print(){ printf "ui_print $*\n\n">$OUTFD;}
-ui_print_exit(){ printf "ui_print $*\n\n">$OUTFD;exit 1;}
+ui_print(){ printf "ui_print $*\nui_print \n">$OUTFD;}
+ui_print_exit(){ ui_print "$*";exit 1;}
 grep_prop(){ grep "^$1=" $2|sed "s/^.*=//g";}
 set_perm(){ chcon $1 $5 && chmod $2 $5 && chown $3:$4 $5;}
 
@@ -147,10 +148,9 @@ XPOSEDZIP=`find $ZIPDIR -type f -iname "xposed-v$VERSION"`
 [ -z $XPOSEDZIP ] \
  &&  ui_print_exit "! File not found: $SEARCH"
 
-IMGSIZE=`unzip -l $XPOSEDZIP |tail -1|\
-         awk '{printf("%.0f\n", (x == int($1/1024/1024)) ? x : int($1/1024/1024)+6) }'`
+IMGSIZE=`unzip -l $XPOSEDZIP |tail -1|awk '{print int($1/1024/1024)+6}'`
 
-[ -z $IMAGESIZE ] || [ $IMGSIZE -le 6 ] \
+[ -z $IMGSIZE ] || [ $IMGSIZE -le 6 ] \
  && ui_print_exit "! Failed: $XPOSEDZIP is corrupt"
 
 printf "${IMGDIR}(/.*)? u:object_r:system_file:s0\n">"$TMPDIR/file_contexts_image"
