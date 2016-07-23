@@ -14,6 +14,7 @@
 ##########################################################################################
 # Changelog
 ##########################################################################################
+# v0.1h - changed unzip routine to be abi-specific, _xposed rename, chromeos removed
 # v0.1g - changed imgsize detection, fixed ui_print, some minor bugs and typo's 
 # v0.1f - changed abi to abilist detection since sdk21+ uses
 # v0.1e - changed bootpartition detection
@@ -43,13 +44,14 @@ IMGDIR="/xposed"
 IMGNAME="xposed.img"
 APP="Universal Systemless Installer for Xposed Framework"
 AUT="st0rm"
-VER="0.1g"
+VER="0.1h"
 LIC="GPL v2"
 
 ##########################################################################################
 # Cleaning up
 ##########################################################################################
 trap '
+ui_print " "
 rm -rf "$TMPDIR"
 sync
 unset LD_LIBRARY_PATH
@@ -61,13 +63,13 @@ exit
 ' 0 1 2 3 15
 
 #LOGSIZE=`wc -c < /tmp/recovery.log`
-[ -f $ZIP.log ] && rm $ZIP.log
+[ -f $ZIP.log ] && rm -f $ZIP.log
 
 ##########################################################################################
 # Functions
 ##########################################################################################
 ui_print(){ printf "ui_print $*\nui_print \n">$OUTFD;}
-ui_print_exit(){ ui_print "$*";exit 1;}
+ui_print_exit(){ ui_print $*;exit 1;}
 grep_prop(){ grep "^$1=" $2|sed "s/^.*=//g";}
 set_perm(){ chcon $1 $5 && chmod $2 $5 && chown $3:$4 $5;}
 
@@ -83,6 +85,7 @@ ui_print " "
 ui_print "     written by: $AUT"
 ui_print "   Licensed under: $LIC"
 ui_print "******************************"
+ui_print " "
 
 ##########################################################################################
 # Mounting
@@ -125,14 +128,19 @@ esac
 
 ui_print "- Cpu architecture: $ABI/$ARCH, sdk$API"
 
-ui_print "- UnZipping into TMPDIR"
+ui_print "- UnZipping into TMPDIR: $TMPDIR"
 mkdir -p "$TMPDIR"
-unzip -o $ZIP -d "$TMPDIR" -x "META-INF/*"
+unzip -o $ZIP "$ABI/*" "common/*" -d "$TMPDIR"
 [ $? -eq 0 ] || ui_print_exit "! Failed: Unable to extract zip file!(0)"
 
 ##########################################################################################
 # Building Xposed Filesystem Image
 ##########################################################################################
+ui_print " "
+ui_print "*************"
+ui_print "Image builder"
+ui_print "*************"
+
 [ ! -d $IMGDIR ] \
   && mkdir -p $IMGDIR
 
@@ -141,7 +149,7 @@ mountpoint -q $IMGDIR \
 
 IMG=$TMPDIR/build.img
 
-SEARCH="xposed-v*-sdk${API}-${ARCH}.zip"
+SEARCH="xposed-v*-sdk${API}-${ARCH}*.zip"
 VERSION=`find $ZIPDIR -type f -iname "$SEARCH" -maxdepth 2|sed 's/^.*xposed-v//'|sort -n|tail -1`
 XPOSEDZIP=`find $ZIPDIR -type f -iname "xposed-v$VERSION"`
 
@@ -171,11 +179,9 @@ ui_print "- UnZipping 'xposed-v$VERSION' into $IMGDIR"
 unzip -o $XPOSEDZIP -d $IMGDIR "system/*"
 [ $? -eq 0 ] || ui_print_exit "! Failed: Unable to extract zip file!(1)"
 
-mv $IMGDIR/system/* $IMGDIR && rmdir $IMGDIR/system
+mv -f $IMGDIR/system/* $IMGDIR && rmdir $IMGDIR/system
 
 find $IMGDIR -type d|while read dir ;do chown 0:0 $dir ;chmod 0755 $dir ;done
-
-find $IMGDIR -type f -name 'app_process*'|while read file;do mv -f $file ${file%_xposed};done
 
 find $IMGDIR -type f|while read file;do
 
@@ -193,6 +199,7 @@ find $IMGDIR -type f|while read file;do
 
   case $file in
     /xposed/bin/app_process*)
+      mv -f $file ${file%_xposed};file=${file%_xposed}
       ui_print "- Applying systemless patch to: $file"
       sed -i 's#/system/lib64/libxposed_art.so#/xposed/lib64/libxposed_art.so#g' $file
       sed -i 's#/system/lib/libxposed_art.so#/xposed/lib/libxposed_art.so#g' $file
@@ -269,77 +276,64 @@ dd bs=4096 if=$BOOTPARTITION of="$TMPDIR/boot.img"
 $SUKERNEL --bootimg-type $TMPDIR/boot.img
 case $? in
  1)	IMGTYPE="android";;
- 2)	IMGTYPE="chromeos";;
+ 2)	ui_print_exit "! Xposed on ChromeOS?, contact me";;
  *)	ui_print_exit "! Failed (type=$IMGTYPE) (exit:[$?])";;
 esac
 
 ui_print "- Boot image type: $IMGTYPE"
 
-if [ "$IMGTYPE" = "chromeos" ]; then
-  FUTILITY=$TMPDIR/$ABI/chromeos/futility
-  [ -f $FUTILITY ] && chmod +x $FUTILITY || ui_print_exit "! FUTILITY not found"
-
-  ui_print "- ChromeOS: Extracting vmlinuz"
-  $FUTILITY vbutil_kernel \
-    --get-vmlinuz $TMPDIR/boot.img \
-    --vmlinuz-out $TMPDIR/boot.chromeos.img
-  mv -f $TMPDIR/boot.chromeos.img $TMPDIR/boot.img \
-    || ui_print_exit "! Failed"
-fi
-
 ui_print "- Patching ramdisk"
+RAMDISKDIR=$TMPDIR/common/ramdisk
 $SUKERNEL --bootimg-extract-ramdisk $TMPDIR/boot.img $TMPDIR/ramdisk.gz
 $SUKERNEL --ungzip $TMPDIR/ramdisk.gz $TMPDIR/ramdisk
-$SUKERNEL --cpio-extract $TMPDIR/ramdisk sepolicy $TMPDIR/sepolicy
 
-$SUKERNEL --cpio-extract $TMPDIR/ramdisk init.rc $TMPDIR/init.rc
-if [ $(grep -c "import /init.xposed.rc" $TMPDIR/init.rc) == 0 ]; then
- sed -i "\#import /init.environ.rc#iimport /init.xposed.rc" $TMPDIR/init.rc
- $SUKERNEL --cpio-add $TMPDIR/ramdisk $TMPDIR/ramdisk 750 init.rc $TMPDIR/init.rc
- ui_print "  > init.rc"
-else
- ui_print "  ! Skipping: init.rc (already patched)"
-fi
+update="
+init.rc
+init.xposed.rc
+sbin/mount_xposed.sh
+xposed
+"
 
-$SUKERNEL --cpio-mkdir $TMPDIR/ramdisk $TMPDIR/ramdisk 755 xposed
-$SUKERNEL --cpio-add $TMPDIR/ramdisk $TMPDIR/ramdisk 750 init.xposed.rc $TMPDIR/common/init.xposed.rc
-$SUKERNEL --cpio-add $TMPDIR/ramdisk $TMPDIR/ramdisk 700 sbin/mount_xposed.sh $TMPDIR/common/mount_xposed.sh
+for item in $update;do
+  case $item in
+    init.rc)
+      $SUKERNEL --cpio-extract $TMPDIR/ramdisk $item $RAMDISKDIR/$item
+      if [ $(grep -c "import /init.xposed.rc" $TMPDIR/$item) == 0 ]; then
+        sed -i "\#import /init.environ.rc#iimport /init.xposed.rc" $RAMDISKDIR/$item
+        $SUKERNEL --cpio-add $TMPDIR/ramdisk $TMPDIR/ramdisk 750 $item $RAMDISKDIR/$item
+        ui_print "  > $item"
+      else
+        ui_print "  ! Skipping: $item (already patched)"
+      fi
+      ;;
+    init.xposed.rc)
+      $SUKERNEL --cpio-add $TMPDIR/ramdisk $TMPDIR/ramdisk 750 $item $RAMDISKDIR/$item
+      ;;
+    sbin/mount_xposed.sh)
+      $SUKERNEL --cpio-add $TMPDIR/ramdisk $TMPDIR/ramdisk 700 $item $RAMDISKDIR/$item
+      ;;
+    xposed)
+      $SUKERNEL --cpio-mkdir $TMPDIR/ramdisk $TMPDIR/ramdisk 755 $item
+      ;;
+  esac
+done
 
 ui_print "- Building new boot image"
 $SUKERNEL --gzip $TMPDIR/ramdisk $TMPDIR/ramdisk.gz
-$SUKERNEL --bootimg-replace-ramdisk $TMPDIR/boot.img $TMPDIR/ramdisk.gz $TMPDIR/new_boot.img
-
-if [ "$IMGTYPE" = "chromeos" ]; then
-  ui_print "- ChromeOS: signing boot image"
-  $FUTILITY vbutil_kernel \
-    --pack $TMPDIR/new_boot.img.signed \
-    --keyblock $TMPDIR/common/chromeos/kernel.keyblock \
-    --signprivate $TMPDIR/common/chromeos/kernel_data_key.vbprivk \
-    --version 1 \
-    --vmlinuz $TMPDIR/new_boot.img \
-    --config $TMPDIR/common/chromeos/kernel.config \
-    --arch arm \
-    --bootloader $TMPDIR/common/chromeos/kernel.bootloader \
-    --flags 0x1
-  mv -f $TMPDIR/new_boot.img.signed $TMPDIR/new_boot.img \
-    || ui_print_exit "! Failed"
-fi
+$SUKERNEL --bootimg-replace-ramdisk $TMPDIR/boot.img $TMPDIR/ramdisk.gz $TMPDIR/patched_boot.img
 
 ui_print "- Syncing data"
 sync
 
 ui_print "- Writing boot partition..."
-dd bs=4096 if=$TMPDIR/new_boot.img of=$BOOTPARTITION
-if [ $? -ne 0 ];then
-  dd bs=4096 if=$TMPDIR/boot.img of=$BOOTPARTITION
-  [ $? -ne 0 ] \
-    && ui_print_exit "!Failed to flash, failed to restore" \
-    || ui_print_exit "!Failed to flash, restored backup"
-else
-  ui_print "> Success"
-fi
+
+dd bs=4096 if=$TMPDIR/patched_boot.img of=$BOOTPARTITION \
+  && { ui_print "> Success";exit 0;}
+
+dd bs=4096 if=$TMPDIR/boot.img of=$BOOTPARTITION \
+  && ui_print_exit "!Failed, succesfully restored backup" \
+  || ui_print_exit "!Failed, failed to restore backup"
 
 ##########################################################################################
-ui_print " "
-ui_print "Done"
-exit 0
+exit 1
+
