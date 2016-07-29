@@ -15,11 +15,18 @@
 ##########################################################################################
 # Changelog
 ##########################################################################################
-# v0.1h - revised imgsize detection, revised imgbuild (reduced by 30%)
+# v0.1i - removed awk for compatibility whether busybox,toolbox and toybox
+#       - fixed search for paths with spaces
+#       - revised librarypath
+#       - added aapt check, if not found, apkname defaults to filename (omnirom)
+#	      - removed incorrect 64-bit patch check
+#       - revised mount process and cleanup
+#       -
+# v0.1h - revised imgsize detection, revised imgbuild (reduced by 35%)
 #       - added sanity checks throughout the script
 #       - boot.img backup to /data or /cache, with md5sum and origin
 #       - removed some obsolete loops, added log optimizations
-#       - added 1mb imgsize buffer for inline patching
+#       - 
 # v0.1g - changed imgsize detection, fixed ui_print, some minor bugs and typo's 
 # v0.1f - changed abi to abilist detection since sdk21+ uses
 # v0.1e - changed bootpartition detection
@@ -50,7 +57,7 @@ IMGNAME="xposed.img"
 LOG="/tmp/recovery.log"
 APP="Universal Systemless Installer for Xposed Framework"
 AUT="st0rm"
-VER="0.1h"
+VER="0.1i"
 LIC="GPL v2"
 
 ##########################################################################################
@@ -62,26 +69,28 @@ ui_print "***********"
 ui_print "Cleaning up"
 ui_print "***********"
 
-ui_print "- Unsetting library path"
-unset LD_LIBRARY_PATH
+ui_print "- Reverting library path"
+LD_LIBRARY_PATH=$LD_LIBRARY_PATH_ORG
 
 ui_print "- Unmounting"
 mountpoint -q $IMGDIR && umount $IMGDIR
 mountpoint -q /system && umount /system
 
+losetup -a|while read LD;do losetup -d ${LD%%:*};done
+
 ui_print "- Removing TMPDIR: $TMPDIR"
 rm -rf "$TMPDIR"
 sync
 
-#[ -f $LOG ] && cat $LOG|tail -c+$LOGSIZE > $ZIP.log
-[ -f $LOG ] && cp -f $LOG $ZIP.log
+#[ -f $LOG ] && cat $LOG|tail -c+$LOGSIZE > "$ZIP.log"
+[ -f $LOG ] && cp -f $LOG "$ZIP.log"
 
 ui_print " "
 exit
 ' 0 1 2 3 15
 
 LOGSIZE=`wc -c < $LOG`
-[ -f $ZIP.log ] && rm -f $ZIP.log
+[ -f "$ZIP.log" ] && rm -f "$ZIP.log"
 
 ##########################################################################################
 # Functions
@@ -114,10 +123,12 @@ mountpoint -q /system || mount -o,ro /system \
 mountpoint -q /data || mount /data || mountpoint -q /cache || mount /cache \
  || ui_print_exit "!Failed, unable to mount /data or /cache"
 
-[ -d /system/lib64 ] \
-  && LD_LIBRARY_PATH=/system/lib64 \
-  || LD_LIBRARY_PATH=/system/lib
-ui_print "- Setting library path: $LD_LIBRARY_PATH"
+LD_LIBRARY_PATH_ORG=$LD_LIBRARY_PATH
+
+[ -d /system/lib ] && LD_LIBRARY_PATH=/system/lib:$LD_LIBRARY_PATH
+[ -d /system/lib64 ] && LD_LIBRARY_PATH=/system/lib64:$LD_LIBRARY_PATH
+
+ui_print "- Updating library path: $LD_LIBRARY_PATH"
 
 ##########################################################################################
 # Prerequisites
@@ -155,32 +166,26 @@ ui_print "Image builder"
 ui_print "*************"
 ui_print "- UnZipping into TMPDIR: $TMPDIR"
 mkdir -p "$TMPDIR"
-unzip -o $ZIP "$ABI/*" "common/*" -d "$TMPDIR"
+unzip -o "$ZIP" "$ABI/*" "common/*" -d "$TMPDIR"
 [ $? -eq 0 ] || ui_print_exit "! Failed: Unable to extract zip file!(0)"
-
-[ ! -d $IMGDIR ] \
-  && mkdir -p $IMGDIR
-
-mountpoint -q $IMGDIR \
-  && umount $IMGDIR
 
 IMG=$TMPDIR/build.img
 
 SEARCH="xposed-v*-sdk${API}-${ARCH}.zip"
-VERSION=`find $ZIPDIR -type f -iname "$SEARCH" -maxdepth 2|sed 's/^.*xposed-v//'|sort -n|tail -1`
-XPOSEDZIP=`find $ZIPDIR -type f -iname "xposed-v$VERSION"`
+VERSION=`find "$ZIPDIR" -type f -iname "$SEARCH" -maxdepth 2|sed 's/^.*xposed-v//'|sort -n|tail -1`
+XPOSEDZIP=`find "$ZIPDIR" -type f -iname "xposed-v$VERSION"`
 
-[ -z $XPOSEDZIP ] \
+[ -z "$XPOSEDZIP" ] \
  &&  ui_print_exit "! File not found: $SEARCH"
 
-IMGSIZE=`unzip -l $XPOSEDZIP "system/*" |tail -1|awk '{print $1}'`
+IMGSIZE=`unzip -l "$XPOSEDZIP" "system/*" |tail -1|xargs|cut -d' ' -f1`
 [ -z $IMGSIZE ] \
- && ui_print_exit "! Failed: $XPOSEDZIP is corrupt"
+ && ui_print_exit "! Failed: cant get contentsize from $XPOSEDZIP "
 
 IMGSIZE=$((IMGSIZE+(1*1024*1024))) # added 1mb buffer for inline patching
 
 printf "${IMGDIR}(/.*)? u:object_r:system_file:s0\n">"$TMPDIR/file_contexts_image"
-ui_print "- Building new image: $IMG ($(awk "BEGIN {printf \"%.1f\n\",$IMGSIZE/1024/1024}")M)"
+ui_print "- Building new image: $IMG ($((IMGSIZE/1024/1024))M)"
 
 make_ext4fs -l "${IMGSIZE}" -a $IMGDIR -S "$TMPDIR/file_contexts_image" $IMG
 tune2fs -O ^has_journal $IMG
@@ -188,15 +193,36 @@ chcon u:object_r:system_data_file:s0 $IMG
 chmod 600 $IMG
 
 ui_print "- Mounting $IMG to $IMGDIR"
-mount -t ext4 -o,rw,noatime $IMG $IMGDIR
-[ $? -eq 0 ] \
-  || ui_print_exit "! Failed: Unable to mount $IMGDIR"
+
+[ ! -d $IMGDIR ] \
+  && mkdir -p $IMGDIR
+
+mountpoint -q $IMGDIR \
+  && umount $IMGDIR
+
+#mount -t ext4 -o,rw,noatime $IMG $IMGDIR
+#[ $? -eq 0 ] \
+#  || ui_print_exit "! Failed: Unable to mount $IMGDIR"
+
+for n in 1 2 3 4 5 6 7;do
+  LD=/dev/block/loop$n
+  [ -b $LD ] \
+    || mknod -m600 $LD b 7 $n \
+    || ui_print_exit "! Failed, unable to create loopdevice"
+  losetup $LD $IMG \
+    || continue
+  mount -t ext4 -o,loop,rw,noatime $LD $IMGDIR \
+    && break
+done
+
+mountpoint -q $IMGDIR \
+ || ui_print_exit "! Failed: Unable to mount $IMGDIR"
 
 rmdir "$IMGDIR/lost+found"
 
 ui_print "- UnZipping 'xposed-v$VERSION' into $IMGDIR"
 
-unzip -o $XPOSEDZIP -d $IMGDIR "system/*"
+unzip -o "$XPOSEDZIP" -d $IMGDIR "system/*"
 [ $? -eq 0 ] || ui_print_exit "! Failed: Unable to extract zip file!(1)"
 
 mv -f $IMGDIR/system/* $IMGDIR && rmdir $IMGDIR/system
@@ -209,8 +235,7 @@ find $IMGDIR -type f|while read file;do
     /xposed/bin/app_process*)
       mv -f $file ${file%_xposed} && file=${file%_xposed}
       ui_print "- Applying systemless patch to: $file"
-      [ "${p##*process}" == "64" ] \
-        && sed -i 's#/system/lib64/libxposed_art.so#/xposed/lib64/libxposed_art.so#g' $file
+      sed -i 's#/system/lib64/libxposed_art.so#/xposed/lib64/libxposed_art.so#g' $file
       sed -i 's#/system/lib/libxposed_art.so#/xposed/lib/libxposed_art.so#g' $file
       sed -i 's#/system/framework/XposedBridge.jar#/xposed/framework/XposedBridge.jar#g' $file
       sed -i 's#/system/xposed.prop#/xposed/xposed.prop#g' $file
@@ -226,10 +251,10 @@ find $IMGDIR -type f|while read file;do
 
   original=/system/${file#$IMGDIR/}
   if [ -f $original ];then
-    CHOWN=$(ls -n $original|awk '{print $3":"$4}')
-    RWX=`ls -la $original |awk '{print $1}'`
+    CHOWN=$(ls -n $original|xargs|cut -d' ' -f3,4|sed 's/ /:/')
+    RWX=$(ls -n $original |xargs|cut -d' ' -f1)
     CHMOD="u=${RWX:1:3},g=${RWX:4:3},o=${RWX:7:3}"
-    CHCON=$(ls -Z $original|awk '{print $2}')
+    CHCON=$(ls -Z $original|xargs|cut -d' ' -f2)
   fi
 
   chown $CHOWN $file
@@ -252,20 +277,26 @@ ui_print "******************"
 ui_print "Package installer"
 ui_print "******************"
 
-SEARCH="*xposed*installer*.apk"
-APKFILE=`find $ZIPDIR -type f -iname "$SEARCH" -maxdepth 2|head -1`
+SEARCH="aapt"
+AAPT=`find "/system" -type f -iname "$SEARCH" -maxdepth 2|head -1`
 
-if [ ! -f $APKFILE ]; then
+SEARCH="*xposed*installer*.apk"
+APKFILE=`find "$ZIPDIR" -type f -iname "$SEARCH" -maxdepth 2|head -1`
+
+
+if [ ! -f "$APKFILE" ]; then
  ui_print "! Skipping install: $APKFILE not found."
 else
- APKNAME=`aapt dump badging "$APKFILE"|grep package|sed "s/^package: name='//;s/' .*$//"`
+ [ -z "$AAPT" ] \
+  && APKNAME="xposed-installer" \
+  || APKNAME=`"$AAPT" dump badging "$APKFILE"|grep package|sed "s/^package: name='//;s/' .*$//"`
  ui_print "- Installing: '${APKFILE##*/}'"
  mountpoint -q /data \
   && APPDIR=/data/app/$APKNAME-1 \
   || APPDIR=/cache/app/$APKNAME-1
 
  [ -d $APPDIR ] || mkdir -p $APPDIR
- [ -f $APPDIR/base.apk ] || cp -f $APKFILE $APPDIR/base.apk
+ [ -f $APPDIR/base.apk ] || cp -f "$APKFILE" $APPDIR/base.apk
  set_perm u:object_r:apk_data_file:s0 755 1000 1000 $APPDIR
  set_perm u:object_r:apk_data_file:s0 644 1000 1000 $APPDIR/base.apk
 fi
@@ -284,7 +315,7 @@ PATCHED_BOOTIMG="$TMPDIR/patched_boot.img"
 SUKERNEL=$TMPDIR/$ABI/sukernel
 [ -f $SUKERNEL ] && chmod +x $SUKERNEL || ui_print_exit "! SUKERNEL not found"
 
-for p in `find /dev/block -type l|grep -iE 'kern-a|android_boot|kernel|boot|lnx'`;do
+for p in `find /dev/block -type l|grep -iE 'android_boot|boot|kern-a|kernel|lnx'`;do
  BOOTPARTITION=`readlink $p`;[ -z $BOOTPARTITION ]||break;done
 [ -z ${BOOTPARTITION} ] \
   && ui_print_exit "! Failed: Boot partition NOT found." \
@@ -297,7 +328,7 @@ dd bs=4096 if=$BOOTPARTITION of=$BOOTIMG
   || ui_print_exit "! Failed"
 
 ui_print "- Backing up boot partition"
-MD5SUM=`md5sum $BOOTIMG|awk '{print $1}'`
+MD5SUM=`md5sum $BOOTIMG|xargs|cut -d' ' -f1`
 mountpoint -q /data \
   && cp -f $BOOTIMG "/data/boot_${BOOTPARTITION##*/}_$MD5SUM.img" \
   || cp -f $BOOTIMG "/cache/boot_${BOOTPARTITION##*/}_$MD5SUM.img"
