@@ -15,11 +15,17 @@
 ##########################################################################################
 # Changelog
 ##########################################################################################
+# v0.1j - revised mount options, removed comma for compatibility busybox,toolbox or toybox
+#       - added diskfree check for /tmp
+#       - revised paths and librarypaths properly
+#       - rollback aapt search
+#       - fixed ls/cut/chown problem
+#       - 
 # v0.1i - removed awk for compatibility whether busybox,toolbox or toybox
 #       - fixed search for paths with spaces
 #       - revised librarypath
 #       - added aapt check, if not found, apkname defaults to filename (omnirom)
-#	      - removed incorrect 64-bit patch check
+#       - removed incorrect 64-bit patch check
 #       - revised mount process and cleanup
 #       -
 # v0.1h - revised imgsize detection, revised imgbuild (reduced by 35%)
@@ -28,7 +34,7 @@
 #       - removed some obsolete loops, added log optimizations
 #       - 
 # v0.1g - changed imgsize detection, fixed ui_print, some minor bugs and typo's 
-# v0.1f - changed abi to abilist detection since sdk21+ uses
+# v0.1f - changed abi to abilist detection since sdk21+
 # v0.1e - changed bootpartition detection
 # v0.1d - fixed some bugs
 # v0.1c - added support for custom xposed frameworks and xposed installers
@@ -57,8 +63,8 @@ IMGNAME="xposed.img"
 LOG="/tmp/recovery.log"
 APP="Universal Systemless Installer for Xposed Framework"
 AUT="st0rm"
-VER="0.1i"
-LIC="GPL v2"
+VER="0.1j"
+LIC="GPLv2"
 
 ##########################################################################################
 # Cleaning up
@@ -70,6 +76,7 @@ ui_print "Cleaning up"
 ui_print "***********"
 
 ui_print "- Reverting library path"
+PATH=$PATH_ORG
 LD_LIBRARY_PATH=$LD_LIBRARY_PATH_ORG
 
 ui_print "- Unmounting"
@@ -82,10 +89,11 @@ ui_print "- Removing TMPDIR: $TMPDIR"
 rm -rf "$TMPDIR"
 sync
 
-#[ -f $LOG ] && cat $LOG|tail -c+$LOGSIZE > "$ZIP.log"
-[ -f $LOG ] && cp -f $LOG "$ZIP.log"
+[ -f $LOG ] && cat $LOG|tail -c+$LOGSIZE > "$ZIP.log"
+#[ -f $LOG ] && cp -f $LOG "$ZIP.log"
 
 ui_print " "
+
 exit
 ' 0 1 2 3 15
 
@@ -118,21 +126,29 @@ ui_print " "
 # Mounting
 ##########################################################################################
 ui_print "- Mounting /system(ro), /data, /cache"
-mountpoint -q /system || mount -o,ro /system \
+mountpoint -q /system || mount -o ro /system \
  || ui_print_exit "! Failed, unable to mount /system"
 mountpoint -q /data || mount /data || mountpoint -q /cache || mount /cache \
  || ui_print_exit "!Failed, unable to mount /data or /cache"
 
+##########################################################################################
+# Updating paths
+##########################################################################################
+PATH_ORG=$PATH
+PATH=/sbin:/system/bin:/system/xbin
+
 LD_LIBRARY_PATH_ORG=$LD_LIBRARY_PATH
+LD_LIBRARY_PATH=.:../lib64:../lib
 
-[ -d /system/lib ] && LD_LIBRARY_PATH=/system/lib:$LD_LIBRARY_PATH
-[ -d /system/lib64 ] && LD_LIBRARY_PATH=/system/lib64:$LD_LIBRARY_PATH
-
-ui_print "- Updating library path: $LD_LIBRARY_PATH"
+ui_print "- Updating library path"
 
 ##########################################################################################
 # Prerequisites
 ##########################################################################################
+#find ${PATH//:/ } -type l|sort|while read file;do
+#  case "${file##*/}" in busybox|toolbox|toybox) ui_print "Found: $file";;esac
+#  printf "$file -> `readlink $file`\n"
+#done
 
 BUILD_PROP="/system/build.prop"
 [ ! -f $BUILD_PROP ] \
@@ -145,14 +161,14 @@ API=`grep_prop ro.build.version.sdk $BUILD_PROP`
 #https://developer.android.com/ndk/guides/abis.html
 #translation to rovo89 xposed releases
 case $ABI in
- armeabi)		ARCH=arm;;
+ armeabi)       ARCH=arm;;
  armeabi-v7a)		ARCH=arm;;
- arm64-v8a)		ARCH=arm64;;
- x86)			ARCH=$ABI;;
- x86_64)		ARCH=$ABI;;
- mips)			ARCH=$ABI;;
- mips64)		ARCH=$ABI;;
- *)			ui_print_exit "! Failed: $ABI is not supported (yet)";;
+ arm64-v8a)     ARCH=arm64;;
+ x86)           ARCH=$ABI;;
+ x86_64)        ARCH=x64;;
+ mips)          ARCH=$ABI;;
+ mips64)        ARCH=$ABI;;
+ *)             ui_print_exit "! Failed: ${ABI:-ABI_EMPTY} is not supported (yet)";;
 esac
 
 ui_print "- Cpu architecture: $ABI/$ARCH, sdk$API"
@@ -184,6 +200,13 @@ IMGSIZE=`unzip -l "$XPOSEDZIP" "system/*" |tail -1|xargs|cut -d' ' -f1`
 
 IMGSIZE=$((IMGSIZE+(1*1024*1024))) # added 1mb buffer for inline patching
 
+FREE=`df -k|grep "/tmp"|xargs|cut -d' ' -f4`
+
+NEED=$((IMGSIZE/1024)) #convert to blocks
+
+[ "$FREE" -le "$NEED" ] \
+  && ui_print_exit "! Failed, /tmp has $((FREE/1024))M free, but $((NEED/1024))M is needed"
+
 printf "${IMGDIR}(/.*)? u:object_r:system_file:s0\n">"$TMPDIR/file_contexts_image"
 ui_print "- Building new image: $IMG ($((IMGSIZE/1024/1024))M)"
 
@@ -200,18 +223,14 @@ ui_print "- Mounting $IMG to $IMGDIR"
 mountpoint -q $IMGDIR \
   && umount $IMGDIR
 
-#mount -t ext4 -o,rw,noatime $IMG $IMGDIR
-#[ $? -eq 0 ] \
-#  || ui_print_exit "! Failed: Unable to mount $IMGDIR"
-
-for n in 1 2 3 4 5 6 7;do
+for n in 0 1 2 3 4 5 6 7;do
   LD=/dev/block/loop$n
   [ -b $LD ] \
     || mknod -m600 $LD b 7 $n \
     || ui_print_exit "! Failed, unable to create loopdevice"
   losetup $LD $IMG \
     || continue
-  mount -t ext4 -o,loop,rw,noatime $LD $IMGDIR \
+  mount -t ext4 -o loop,rw,noatime $LD $IMGDIR \
     && break
 done
 
@@ -251,15 +270,30 @@ find $IMGDIR -type f|while read file;do
 
   original=/system/${file#$IMGDIR/}
   if [ -f $original ];then
-    CHOWN=$(ls -n $original|xargs|cut -d' ' -f3,4|sed 's/ /:/')
-    RWX=$(ls -n $original |xargs|cut -d' ' -f1)
-    CHMOD="u=${RWX:1:3},g=${RWX:4:3},o=${RWX:7:3}"
+
+    case `readlink $(which ls)` in
+      busybox|toybox) FIELDS="3,4" ;;
+      toolbox)        FIELDS="2,3" ;;
+    esac
+
+    CHOWN=$(ls -n $original|xargs|cut -d' ' -f$FIELDS|sed 's/ /:/')
+    RWX=$(ls -n $original|xargs|cut -d' ' -f1|sed 's/r/4/g;s/w/2/g;s/x/1/g;s/-/0/g')
+    CHMOD=$((${RWX:1:1}+${RWX:2:1}+${RWX:3:1}))$((${RWX:4:1}+${RWX:5:1}+${RWX:6:1}))$((${RWX:7:1}+${RWX:8:1}+${RWX:9:1}))
     CHCON=$(ls -Z $original|xargs|cut -d' ' -f2)
+
   fi
 
+  echo ""
+  [ -f $original ] && echo "$original : `ls -n $original`" || echo "No /system counterpart for: $file using defaults"
+  [ -f $original ] && echo "$original : `ls -Z $original`"
   chown $CHOWN $file
+  echo "chown $CHOWN $file"
   chmod $CHMOD $file
+  echo "chmod $CHMOD $file"
   chcon $CHCON $file
+  echo "chcon $CHCON $file"
+  echo "$file : `ls -n $file`"
+  echo "$file : `ls -Z $file`"
 
 done
 
@@ -283,13 +317,11 @@ AAPT=`find "/system" -type f -iname "$SEARCH" -maxdepth 2|head -1`
 SEARCH="*xposed*installer*.apk"
 APKFILE=`find "$ZIPDIR" -type f -iname "$SEARCH" -maxdepth 2|head -1`
 
-
 if [ ! -f "$APKFILE" ]; then
  ui_print "! Skipping install: $APKFILE not found."
 else
- [ -z "$AAPT" ] \
-  && APKNAME="xposed-installer" \
-  || APKNAME=`"$AAPT" dump badging "$APKFILE"|grep package|sed "s/^package: name='//;s/' .*$//"`
+ APKNAME=`$AAPT dump badging "$APKFILE"|grep package|sed "s/^package: name='//;s/' .*$//"`
+ [ -z "$APKNAME" ] && APKNAME="xposed-installer" 
  ui_print "- Installing: '${APKFILE##*/}'"
  mountpoint -q /data \
   && APPDIR=/data/app/$APKNAME-1 \
