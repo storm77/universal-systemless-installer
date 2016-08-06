@@ -1,9 +1,9 @@
 on post-fs-data
-    mount ext4 loop@/data/xposed.img /xposed ro noatime
-    exec /sbin/mount_xposed.sh
-    exec u:r:init:s0 root root -- /sbin/mount_xposed.sh
+    exec /sbin/mount_xposed.sh --regular
+    exec u:r:init:s0 root root -- /sbin/mount_xposed.sh --selinux_file_context
 
-service xposed_cache /sbin/mount_xposed.sh --cache
+#late_start services are not started until after /data has been decrypted and mounted
+service xposed_cache /sbin/mount_xposed.sh --service_oneshot
     class late_start
     user root
     seclabel u:r:init:s0
