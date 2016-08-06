@@ -1,49 +1,87 @@
 #!/system/bin/sh
 
+#date=`date +%Y%m%d-%H%M%S`
+#source /data/media/0/xposed.sh $* 1>/data/media/0/xposed_$date.log 2>&1
+#chown 1023:1023 /data/media/0/xposed.log
+#chmod 777 /data/media/0/xposed.log
+#exit 0
+
+#set -x
+
+log_xposed() { log -p i -t Xposed "$0: $*";}
+log_xposed_exit() { log_xposed $*;exit 1;}
+
+log_xposed "running script: $0: $*"
+[ "`getprop xposed.mount`" -eq "1" ] \
+ && log_xposed_exit "script already executed"
+
 IC=/cache/xposed.img
 ID=/data/xposed.img
 IMGDIR=/xposed
 APPDIR=/cache/app
 
-log_xposed() { echo $1;log -p i -t Xposed "$0: $1";}
-log_xposed_exit() { echo $1;log -p i -t Xposed "$0: $1";exit 1;}
+try_mount(){
+ for n in 0 1 2 3 4 5 6 7;do
+  LD=/dev/block/loop$n
+  [ -b $LD ] \
+   || mknod -m600 $LD b 7 $n \
+   || log_xposed_exit "unable to create loop device"
+  losetup -s $LD \
+   && continue
+  losetup $LD $ID \
+   || continue
+  mount -t ext4 -o loop,ro,noatime $LD $IMGDIR \
+   && break
+ done
+}
 
-#disabled
-[ -f /data/data/de.robv.android.xposed.installer/conf/disabled ] \
-  && log_xposed_exit "xposed disabled by user"
+#data not mounted
+mountpoint -q /data \
+ || log_xposed_exit "data not mounted, nothing to do"
 
-#image in /cache
-if [ "$1" == "--cache" ] && [ -f $IC ]; then
- log_xposed "move from /cache to /data"
+#data in /cache
+if [ -f $IC ]; then
+ log_xposed "found $IC, moving to /data"
  mv -f $IC $ID
  if [ -f $APPDIR/*-1 ]; then
   log_xposed "found /cache/app/*-1 , moving to /data/app"
   mv -f $APPDIR/*-1 /data/app
  fi
+ if [ -f /cache/boot*.img ]; then
+  log_xposed "found boot image backup in /cache, moving to /data"
+  cp -f  /cache/boot*.img /data
+ fi
  reboot
 fi
 
+#disabled
+[ -f /data/data/de.robv.android.xposed.installer/conf/disabled ] \
+ && log_xposed_exit "xposed disabled by user"
+
 #image not found in /data
 [ -f $ID ] \
-  || log_xposed_exit "$ID not found, nothing to do"
-
-#bind mounts already executed
-[ `getprop xposed.mount` -eq 1 ] \
-  && log_xposed_exit "bind mounts already executed"
+ || log_xposed_exit "$ID not found, nothing to do"
 
 #start
-mountpoint -q $IMGDIR
-if [ $? -ne 0 ]; then
- log_xposed "init image mount failed, starting manual mount"
+if ! mountpoint -q $IMGDIR; then
+ log_xposed "start mounting process..."
  e2fsck -p $ID
  chcon u:object_r:system_data_file:s0 $ID
  chmod 0600 $ID
- mount -o ro,noatime $ID $IMGDIR && log_xposed "manual loop mount success"
-else
- log_xposed "init image mount success, starting bind mount:"
+ try_mount \
+  && log_xposed "success" \
+  || log_xposed_exit "unable to mount xposed.img"
+fi
+
+#bindmount
+if [ "`getprop xposed.mount`" -ne "1" ]; then
+ log_xposed "starting bind mount:"
  find $IMGDIR -type f|while read file;do
-  mount -o bind $file /system/${file#$IMGDIR/}
+  [ -f /system/${file#$IMGDIR/} ] \
+   && mount -o bind $file /system/${file#$IMGDIR/}
  done
  setprop xposed.mount 1
 fi
+
+exit 0
 
