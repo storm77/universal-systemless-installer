@@ -15,6 +15,10 @@
 ##########################################################################################
 # Changelog
 ##########################################################################################
+# v0.1k - revised imgsize
+#       - revised unpack method
+#       - revised mount script and init.rc
+#       -
 # v0.1j - revised mount options, removed comma for compatibility busybox,toolbox or toybox
 #       - added diskfree check for /tmp
 #       - revised paths and librarypaths properly
@@ -50,7 +54,7 @@
 # https://github.com/dvdandroid/XposedInstaller : dvdandroid - xposed-installer
 # http://forum.xda-developers.com/xposed/super-alpha-posted-permission-xposed-t3072979 -
 # romracer / xposed-installer
-
+# https://ge0n0sis.github.io/posts/2015/12/exploring-androids-selinux-kernel-policy/
 ##########################################################################################
 # Variables
 ##########################################################################################
@@ -63,7 +67,7 @@ IMGNAME="xposed.img"
 LOG="/tmp/recovery.log"
 APP="Universal Systemless Installer for Xposed Framework"
 AUT="st0rm"
-VER="0.1j"
+VER="0.1k"
 LIC="GPLv2"
 
 ##########################################################################################
@@ -99,6 +103,7 @@ exit
 
 LOGSIZE=`wc -c < $LOG`
 [ -f "$ZIP.log" ] && rm -f "$ZIP.log"
+
 
 ##########################################################################################
 # Functions
@@ -145,10 +150,12 @@ ui_print "- Updating library path"
 ##########################################################################################
 # Prerequisites
 ##########################################################################################
-#find ${PATH//:/ } -type l|sort|while read file;do
-#  case "${file##*/}" in busybox|toolbox|toybox) ui_print "Found: $file";;esac
-#  printf "$file -> `readlink $file`\n"
-#done
+find ${PATH//:/ } -type l|sort|while read file;do
+  case "${file##*/}" in busybox|toolbox|toybox) ui_print "Found: $file";;esac
+  printf "$file -> `readlink $file`\n"
+done
+
+#todo: implement toolcheck busybox, toybox and toolbox
 
 BUILD_PROP="/system/build.prop"
 [ ! -f $BUILD_PROP ] \
@@ -194,15 +201,18 @@ XPOSEDZIP=`find "$ZIPDIR" -type f -iname "xposed-v$VERSION"`
 [ -z "$XPOSEDZIP" ] \
  &&  ui_print_exit "! File not found: $SEARCH"
 
-IMGSIZE=`unzip -l "$XPOSEDZIP" "system/*" |tail -1|xargs|cut -d' ' -f1`
-[ -z $IMGSIZE ] \
- && ui_print_exit "! Failed: cant get contentsize from $XPOSEDZIP "
+unzip -l "$XPOSEDZIP"
+IMGSIZE=`unzip -l "$XPOSEDZIP" "system/*" "$ARCH/system/*" |tail -1|xargs|cut -d' ' -f1`
+[ -z $IMGSIZE ] || [ "$IMGSIZE" -eq "0" ] && ui_print_exit "! Failed, no files to extract"
+
+# journal= 1024*blocksize + filesystem 32*blocksize
+[ "$IMGSIZE" -lt $((1056*4096)) ] && IMGSIZE=$((1056*4096))
 
 IMGSIZE=$((IMGSIZE+(1*1024*1024))) # added 1mb buffer for inline patching
 
 FREE=`df -k|grep "/tmp"|xargs|cut -d' ' -f4`
 
-NEED=$((IMGSIZE/1024)) #convert to blocks
+NEED=$(((IMGSIZE/1024)+2)) #convert to blocks, 1 for round up, 1 for filesystem entry
 
 [ "$FREE" -le "$NEED" ] \
   && ui_print_exit "! Failed, /tmp has $((FREE/1024))M free, but $((NEED/1024))M is needed"
@@ -210,7 +220,8 @@ NEED=$((IMGSIZE/1024)) #convert to blocks
 printf "${IMGDIR}(/.*)? u:object_r:system_file:s0\n">"$TMPDIR/file_contexts_image"
 ui_print "- Building new image: $IMG ($((IMGSIZE/1024/1024))M)"
 
-make_ext4fs -l "${IMGSIZE}" -a $IMGDIR -S "$TMPDIR/file_contexts_image" $IMG
+make_ext4fs -l "${IMGSIZE}" -a $IMGDIR -S "$TMPDIR/file_contexts_image" $IMG \
+  || ui_print_exit "! Failed, to create $IMG"
 tune2fs -O ^has_journal $IMG
 chcon u:object_r:system_data_file:s0 $IMG
 chmod 600 $IMG
@@ -264,10 +275,6 @@ find $IMGDIR -type f|while read file;do
       ;;
   esac
 
-  CHOWN=0:0
-  CHMOD=644
-  CHCON=u:object_r:system_file:s0
-
   original=/system/${file#$IMGDIR/}
   if [ -f $original ];then
 
@@ -286,14 +293,15 @@ find $IMGDIR -type f|while read file;do
   echo ""
   [ -f $original ] && echo "$original : `ls -n $original`" || echo "No /system counterpart for: $file using defaults"
   [ -f $original ] && echo "$original : `ls -Z $original`"
-  chown $CHOWN $file
-  echo "chown $CHOWN $file"
-  chmod $CHMOD $file
+  chown ${CHOWN:-0:0} $file
+  echo "chown ${CHOWN:-0:0} $file"
+  chmod ${CHMOD:-644} $file
   echo "chmod $CHMOD $file"
-  chcon $CHCON $file
-  echo "chcon $CHCON $file"
+  chcon ${CHCON:-u:object_r:system_file:s0} $file
+  echo "chcon ${CHCON:-u:object_r:system_file:s0} $file"
   echo "$file : `ls -n $file`"
   echo "$file : `ls -Z $file`"
+  CHOWN=;CHMOD=;CHCON=;
 
 done
 
@@ -320,7 +328,7 @@ APKFILE=`find "$ZIPDIR" -type f -iname "$SEARCH" -maxdepth 2|head -1`
 if [ ! -f "$APKFILE" ]; then
  ui_print "! Skipping install: $APKFILE not found."
 else
- APKNAME=`$AAPT dump badging "$APKFILE"|grep package|sed "s/^package: name='//;s/' .*$//"`
+ APKNAME=`[ -z "$AAPT" ] && $AAPT dump badging "$APKFILE"|grep package|sed "s/^package: name='//;s/' .*$//"`
  [ -z "$APKNAME" ] && APKNAME="xposed-installer" 
  ui_print "- Installing: '${APKFILE##*/}'"
  mountpoint -q /data \
