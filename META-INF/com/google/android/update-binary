@@ -15,6 +15,12 @@
 ##########################################################################################
 # Changelog
 ##########################################################################################
+# v0.1l - revised bootdetection properly
+#       - revised file attribute detection completely
+#       - revised loopback options
+#       - updated mount script
+#       - added multiarch archive check (arm/arm64/x86/x64/mips/mips64)
+#       -
 # v0.1k - revised imgsize
 #       - revised unpack method
 #       - revised mount script and init.rc
@@ -55,6 +61,7 @@
 # http://forum.xda-developers.com/xposed/super-alpha-posted-permission-xposed-t3072979 -
 # romracer / xposed-installer
 # https://ge0n0sis.github.io/posts/2015/12/exploring-androids-selinux-kernel-policy/
+# https://github.com/ManhIT-CMB/SpaceX-Kernel-Exynos7420/commit/a1ff5ccc20e7e3d839afdd9a3a7e217d536b4749
 ##########################################################################################
 # Variables
 ##########################################################################################
@@ -67,7 +74,7 @@ IMGNAME="xposed.img"
 LOG="/tmp/recovery.log"
 APP="Universal Systemless Installer for Xposed Framework"
 AUT="st0rm"
-VER="0.1k"
+VER="0.1l"
 LIC="GPLv2"
 
 ##########################################################################################
@@ -150,12 +157,17 @@ ui_print "- Updating library path"
 ##########################################################################################
 # Prerequisites
 ##########################################################################################
-find ${PATH//:/ } -type l|sort|while read file;do
-  case "${file##*/}" in busybox|toolbox|toybox) ui_print "Found: $file";;esac
-  printf "$file -> `readlink $file`\n"
-done
+#find ${PATH//:/ } -type l|sort|while read file;do
+#  case "${file##*/}" in busybox|toolbox|toybox) ui_print "Found: $file";;esac
+#  printf "$file -> `readlink $file`\n"
+#done
 
-#todo: implement toolcheck busybox, toybox and toolbox
+#toolcheck busybox, toybox and toolbox
+case `readlink $(which ls)` in
+  busybox) CHCON_OPTIONS="-f2";;
+  toybox)  CHCON_OPTIONS="-f1";;
+  toolbox) CHCON_OPTIONS="-f4";;
+esac
 
 BUILD_PROP="/system/build.prop"
 [ ! -f $BUILD_PROP ] \
@@ -166,7 +178,7 @@ ABI=`grep_prop ro.product.cpu.abilist $BUILD_PROP|sed 's/,/\n/g'|head -1`
 API=`grep_prop ro.build.version.sdk $BUILD_PROP`
 
 #https://developer.android.com/ndk/guides/abis.html
-#translation to rovo89 xposed releases
+#translation to rovo89 xposed releases, also used for multiarch zips
 case $ABI in
  armeabi)       ARCH=arm;;
  armeabi-v7a)		ARCH=arm;;
@@ -175,7 +187,7 @@ case $ABI in
  x86_64)        ARCH=x64;;
  mips)          ARCH=$ABI;;
  mips64)        ARCH=$ABI;;
- *)             ui_print_exit "! Failed: ${ABI:-ABI_EMPTY} is not supported (yet)";;
+ *)             ui_print_exit "! Failed: [$ABI] is not supported (yet)";;
 esac
 
 ui_print "- Cpu architecture: $ABI/$ARCH, sdk$API"
@@ -241,7 +253,7 @@ for n in 0 1 2 3 4 5 6 7;do
     || ui_print_exit "! Failed, unable to create loopdevice"
   losetup $LD $IMG \
     || continue
-  mount -t ext4 -o loop,rw,noatime $LD $IMGDIR \
+  mount -t ext4 -o rw,noatime $LD $IMGDIR \
     && break
 done
 
@@ -255,7 +267,8 @@ ui_print "- UnZipping 'xposed-v$VERSION' into $IMGDIR"
 unzip -o "$XPOSEDZIP" -d $IMGDIR "system/*"
 [ $? -eq 0 ] || ui_print_exit "! Failed: Unable to extract zip file!(1)"
 
-mv -f $IMGDIR/system/* $IMGDIR && rmdir $IMGDIR/system
+[ -d $IMGDIR/$ARCH/system ] && mv -f $IMGDIR/$ARCH/system/* $IMGDIR && rmdir $IMGDIR/$ARCH/system && rmdir $IMGDIR/system
+[ -d $IMGDIR/system ] && mv -f $IMGDIR/system/* $IMGDIR && rmdir $IMGDIR/system
 
 find $IMGDIR -type d|while read dir ;do chown 0:0 $dir ;chmod 0755 $dir ;done
 
@@ -275,33 +288,15 @@ find $IMGDIR -type f|while read file;do
       ;;
   esac
 
+  CHOWN=;ATTR=;
+
   original=/system/${file#$IMGDIR/}
   if [ -f $original ];then
-
-    case `readlink $(which ls)` in
-      busybox|toybox) FIELDS="3,4" ;;
-      toolbox)        FIELDS="2,3" ;;
-    esac
-
-    CHOWN=$(ls -n $original|xargs|cut -d' ' -f$FIELDS|sed 's/ /:/')
-    RWX=$(ls -n $original|xargs|cut -d' ' -f1|sed 's/r/4/g;s/w/2/g;s/x/1/g;s/-/0/g')
-    CHMOD=$((${RWX:1:1}+${RWX:2:1}+${RWX:3:1}))$((${RWX:4:1}+${RWX:5:1}+${RWX:6:1}))$((${RWX:7:1}+${RWX:8:1}+${RWX:9:1}))
-    CHCON=$(ls -Z $original|xargs|cut -d' ' -f2)
-
+    ATTR=`stat $original|grep Uid|tr '()/' ' '|xargs|cut -d' ' -f2,5,8`
+    CHCON=$(ls -Z $original|xargs|cut -d' ' $CHCON_OPTIONS)
   fi
 
-  echo ""
-  [ -f $original ] && echo "$original : `ls -n $original`" || echo "No /system counterpart for: $file using defaults"
-  [ -f $original ] && echo "$original : `ls -Z $original`"
-  chown ${CHOWN:-0:0} $file
-  echo "chown ${CHOWN:-0:0} $file"
-  chmod ${CHMOD:-644} $file
-  echo "chmod $CHMOD $file"
-  chcon ${CHCON:-u:object_r:system_file:s0} $file
-  echo "chcon ${CHCON:-u:object_r:system_file:s0} $file"
-  echo "$file : `ls -n $file`"
-  echo "$file : `ls -Z $file`"
-  CHOWN=;CHMOD=;CHCON=;
+  set_perm ${CHCON:=u:object_r:system_file:s0} ${ATTR:="644 0 0"} $file
 
 done
 
@@ -326,9 +321,9 @@ SEARCH="*xposed*installer*.apk"
 APKFILE=`find "$ZIPDIR" -type f -iname "$SEARCH" -maxdepth 2|head -1`
 
 if [ ! -f "$APKFILE" ]; then
- ui_print "! Skipping install: $APKFILE not found."
+ ui_print "! Skipping install: $SEARCH not found."
 else
- APKNAME=`[ -z "$AAPT" ] && $AAPT dump badging "$APKFILE"|grep package|sed "s/^package: name='//;s/' .*$//"`
+ APKNAME=`[ -z "$AAPT" ] || $AAPT dump badging "$APKFILE"|grep package|sed "s/^package: name='//;s/' .*$//"`
  [ -z "$APKNAME" ] && APKNAME="xposed-installer" 
  ui_print "- Installing: '${APKFILE##*/}'"
  mountpoint -q /data \
@@ -355,11 +350,20 @@ PATCHED_BOOTIMG="$TMPDIR/patched_boot.img"
 SUKERNEL=$TMPDIR/$ABI/sukernel
 [ -f $SUKERNEL ] && chmod +x $SUKERNEL || ui_print_exit "! SUKERNEL not found"
 
-for p in `find /dev/block -type l|grep -iE 'android_boot|boot|kern-a|kernel|lnx'`;do
- BOOTPARTITION=`readlink $p`;[ -z $BOOTPARTITION ]||break;done
+for p in `find /dev/block -type l \( -iname "android_boot" -o -iname "boot" -o -iname "kern-a" -o -iname "kernel" -o -iname "lnx" \)`;do
+ BOOTPARTITION=`readlink $p`;[ -z $BOOTPARTITION ]||break
+done
+
 [ -z ${BOOTPARTITION} ] \
   && ui_print_exit "! Failed: Boot partition NOT found." \
   || ui_print "- Found boot partition: $BOOTPARTITION"
+
+SIGNATURE=`dd bs=8 count=1 if=$BOOTPARTITION`
+case $SIGNATURE in
+ "ANDROID!")	;;
+#"CHROMEOS")	;;
+ *)	ui_print_exit "! Failed, unknown boot signature: [$SIGNATURE]";;
+esac
 
 ui_print "- Reading boot partition..."
 dd bs=4096 if=$BOOTPARTITION of=$BOOTIMG
@@ -374,12 +378,12 @@ mountpoint -q /data \
   || cp -f $BOOTIMG "/cache/boot_${BOOTPARTITION##*/}_$MD5SUM.img"
 
 #Exitcode: 0/error, 1/Android, 2/ChromeOS
-$SUKERNEL --bootimg-type $BOOTIMG
-case $? in
- 1)	IMGTYPE="android";;
+#$SUKERNEL --bootimg-type $BOOTIMG
+#case $? in
+# 1)	IMGTYPE="android";;
 #2)	IMGTYPE="chromeos";;
- *)	ui_print_exit "! Failed (type=$IMGTYPE) (exit:[$?])";;
-esac
+# *)	ui_print_exit "! Failed (type=$IMGTYPE) (exit:[$?])";;
+#esac
 
 ui_print "- Patching ramdisk"
 
