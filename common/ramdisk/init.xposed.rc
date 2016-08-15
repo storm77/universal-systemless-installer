@@ -1,4 +1,5 @@
 on post-fs-data
+    exec rm -f /data/xposed.log
     exec /sbin/mount_xposed.sh --regular
     exec u:r:init:s0 root root -- /sbin/mount_xposed.sh --selinux_file_context
 
