@@ -1,17 +1,12 @@
 #!/system/bin/sh
-
-#date=`date +%Y%m%d-%H%M%S`
-#source /data/media/0/xposed.sh $* 1>/data/media/0/xposed_$date.log 2>&1
-#chown 1023:1023 /data/media/0/xposed.log
-#chmod 777 /data/media/0/xposed.log
-#exit 0
-
-#set -x
-
+[ "$1" == "--regular" ] && rm -f /data/xposed.log
+exec 3>&1 4>&2
+trap 'exec 2>&4 1>&3' 0 1 2 3
+exec 1>>/data/xposed.log 2>&1
 log_xposed() { log -p i -t Xposed "$0: $*";}
 log_xposed_exit() { log_xposed $*;exit 1;}
 
-log_xposed "running script: $0: $*"
+log_xposed "running script: $0: $*";set -x
 [ "`getprop xposed.mount`" -eq "1" ] \
  && log_xposed_exit "script already executed"
 
@@ -30,7 +25,7 @@ try_mount(){
    && continue
   losetup $LD $ID \
    || continue
-  mount -t ext4 -o loop,ro,noatime $LD $IMGDIR \
+  mount -t ext4 -o ro,noatime $LD $IMGDIR \
    && break
  done
 }
